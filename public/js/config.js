@@ -1,26 +1,16 @@
 export const CONFIG = {
     CANVAS: {
-        // Use fixed dimensions for game logic
-        LOGICAL_WIDTH: 800,
-        LOGICAL_HEIGHT: 600,
         get WIDTH() {
-            return this.LOGICAL_WIDTH; // Always use logical width for calculations
-        },
-        get HEIGHT() {
-            return this.LOGICAL_HEIGHT; // Always use logical height for calculations
-        },
-        // Display dimensions
-        get DISPLAY_WIDTH() {
             if (window.innerWidth <= 768) {
                 return Math.min(window.innerWidth * 0.95, 600);
             }
-            return this.LOGICAL_WIDTH;
+            return 800;
         },
-        get DISPLAY_HEIGHT() {
+        get HEIGHT() {
             if (window.innerWidth <= 768) {
                 return Math.min(window.innerHeight * 0.7, 400);
             }
-            return this.LOGICAL_HEIGHT;
+            return 600;
         }
     },
     PUCK: {

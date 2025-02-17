@@ -26,24 +26,6 @@ class Game {
         
         // Add window resize handler
         window.addEventListener('resize', () => this.updateScalingFactors());
-
-        // Set up display canvas
-        this.displayCanvas = document.getElementById('gameCanvas');
-        
-        // Create a hidden canvas for game logic
-        this.logicCanvas = document.createElement('canvas');
-        this.logicCanvas.width = CONFIG.CANVAS.LOGICAL_WIDTH;
-        this.logicCanvas.height = CONFIG.CANVAS.LOGICAL_HEIGHT;
-        
-        // Set up contexts
-        this.displayCtx = this.displayCanvas.getContext('2d');
-        this.ctx = this.logicCanvas.getContext('2d');
-        
-        // Initialize with proper dimensions
-        this.updateCanvasDimensions();
-        
-        // Add resize handler
-        window.addEventListener('resize', () => this.updateCanvasDimensions());
     }
 
     init(gameMode) {
@@ -114,7 +96,9 @@ class Game {
     handleMouseDown(e) {
         if (this.gameState.gameEnded || this.gameState.currentPuck) return;
 
-        const { x, y } = this.convertToGameCoordinates(e.clientX, e.clientY);
+        const rect = this.canvas.getBoundingClientRect();
+        const x = (e.clientX - rect.left) * this.scaleX;
+        const y = (e.clientY - rect.top) * this.scaleY;
 
         // Check if player has pucks remaining
         if (this.gameState.puckCounts[`player${this.gameState.activePlayer}`] >= CONFIG.PUCK.MAX_PUCKS_PER_PLAYER) {
@@ -627,19 +611,111 @@ class Game {
     }
 
     render() {
-        // Clear both canvases
-        this.ctx.clearRect(0, 0, this.logicCanvas.width, this.logicCanvas.height);
-        this.displayCtx.clearRect(0, 0, this.displayCanvas.width, this.displayCanvas.height);
+        // Clear canvas
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         
-        // Draw on logic canvas
-        // ... your existing drawing code using this.ctx ...
+        // Draw territory if in territory mode
+        if (this.gameState.gameMode === CONFIG.GAME_MODES.TERRITORY) {
+            this.drawTerritory();
+            console.log('Drawing territory');
+        }
         
-        // Copy to display canvas with proper scaling
-        this.displayCtx.drawImage(
-            this.logicCanvas,
-            0, 0, this.logicCanvas.width, this.logicCanvas.height,
-            0, 0, this.displayCanvas.width, this.displayCanvas.height
-        );
+        // Draw game board
+        this.drawBoard();
+        
+        // Draw restricted zones
+        this.drawRestrictedZones();
+        
+        // Draw power bar
+        this.drawPowerBar();
+
+        // Draw rotation center and rotating puck
+        if (this.gameState.isCharging) {
+            // Draw center point
+            this.ctx.beginPath();
+            this.ctx.arc(
+                this.gameState.rotationCenter.x,
+                this.gameState.rotationCenter.y,
+                3, 0, Math.PI * 2
+            );
+            this.ctx.fillStyle = '#333';
+            this.ctx.fill();
+            
+            // Draw rope connecting center to puck
+            if (this.gameState.currentPuck) {
+                this.ctx.beginPath();
+                this.ctx.moveTo(this.gameState.rotationCenter.x, this.gameState.rotationCenter.y);
+                this.ctx.lineTo(this.gameState.currentPuck.x, this.gameState.currentPuck.y);
+                this.ctx.strokeStyle = '#666';
+                this.ctx.setLineDash([5, 5]); // Create dashed line
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+                this.ctx.setLineDash([]); // Reset line style
+            }
+            
+            // Draw rotation path
+            this.ctx.beginPath();
+            this.ctx.arc(
+                this.gameState.rotationCenter.x,
+                this.gameState.rotationCenter.y,
+                this.gameState.rotationRadius,
+                0, Math.PI * 2
+            );
+            this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+            this.ctx.stroke();
+            
+            // Draw rotating puck with direction arrow
+            if (this.gameState.currentPuck) {
+                this.drawPuck(
+                    this.gameState.currentPuck.x,
+                    this.gameState.currentPuck.y,
+                    this.gameState.currentPuck.player
+                );
+                
+                // Draw launch direction arrow
+                this.drawLaunchDirectionArrow(
+                    this.gameState.currentPuck,
+                    this.gameState.rotationCenter
+                );
+            }
+        } else if (this.previewPuckPosition) {
+            this.drawPuck(
+                this.previewPuckPosition.x,
+                this.previewPuckPosition.y,
+                this.gameState.activePlayer,
+                true
+            );
+        }
+        
+        // Draw all pucks (including both players' pucks)
+        this.gameState.pucks.forEach(puck => {
+            if (!puck.isCharging) {  // Only draw non-charging pucks
+                this.drawPuck(puck.x, puck.y, puck.player);
+            }
+        });
+
+        // Draw the currently charging puck if it exists
+        if (this.gameState.isCharging && this.gameState.currentPuck) {
+            this.drawPuck(
+                this.gameState.currentPuck.x,
+                this.gameState.currentPuck.y,
+                this.gameState.currentPuck.player
+            );
+        }
+
+        // Draw scoreboard
+        this.drawScoreboard();
+
+        // Draw score popups
+        this.drawScorePopups();
+
+        // Draw game end overlay if game has ended
+        if (this.gameState.gameEnded) {
+            this.drawGameEndOverlay();
+        }
+
+        // Draw sparks last (top layer)
+        this.drawSparks();
     }
 
     drawBoard() {
@@ -1244,7 +1320,7 @@ class Game {
         let isTouching = false;
         let touchX, touchY;
 
-        this.displayCanvas.addEventListener('touchstart', (e) => {
+        this.canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
             if (this.gameState.gameEnded || this.gameState.currentPuck) return;
             if (this.gameState.activePlayer !== this.playerNumber) return;
@@ -1252,7 +1328,7 @@ class Game {
             isTouching = true;
             touchStartTime = Date.now();
             const touch = e.touches[0];
-            const rect = this.displayCanvas.getBoundingClientRect();
+            const rect = this.canvas.getBoundingClientRect();
             touchX = (touch.clientX - rect.left) * this.scaleX;
             touchY = (touch.clientY - rect.top) * this.scaleY;
 
@@ -1271,11 +1347,11 @@ class Game {
             }
         }, { passive: false });
 
-        this.displayCanvas.addEventListener('touchmove', (e) => {
+        this.canvas.addEventListener('touchmove', (e) => {
             e.preventDefault();
             if (isTouching && this.gameState.isCharging) {
                 const touch = e.touches[0];
-                const rect = this.displayCanvas.getBoundingClientRect();
+                const rect = this.canvas.getBoundingClientRect();
                 touchX = (touch.clientX - rect.left) * this.scaleX;
                 touchY = (touch.clientY - rect.top) * this.scaleY;
                 
@@ -1287,7 +1363,7 @@ class Game {
             }
         }, { passive: false });
 
-        this.displayCanvas.addEventListener('touchend', (e) => {
+        this.canvas.addEventListener('touchend', (e) => {
             e.preventDefault();
             if (isTouching && this.gameState.isCharging) {
                 // Use existing launch logic
@@ -1296,7 +1372,7 @@ class Game {
             isTouching = false;
         }, { passive: false });
 
-        this.displayCanvas.addEventListener('touchcancel', (e) => {
+        this.canvas.addEventListener('touchcancel', (e) => {
             e.preventDefault();
             if (this.gameState.isCharging) {
                 this.gameState.isCharging = false;
@@ -1313,35 +1389,6 @@ class Game {
         return {
             x: x * this.scaleX,
             y: y * this.scaleY
-        };
-    }
-
-    updateCanvasDimensions() {
-        // Update display canvas size
-        this.displayCanvas.width = CONFIG.CANVAS.DISPLAY_WIDTH;
-        this.displayCanvas.height = CONFIG.CANVAS.DISPLAY_HEIGHT;
-        
-        // Calculate scale factors
-        this.scaleX = CONFIG.CANVAS.LOGICAL_WIDTH / this.displayCanvas.width;
-        this.scaleY = CONFIG.CANVAS.LOGICAL_HEIGHT / this.displayCanvas.height;
-        
-        // Set display canvas scaling
-        this.displayCtx.setTransform(
-            this.displayCanvas.width / CONFIG.CANVAS.LOGICAL_WIDTH,
-            0,
-            0,
-            this.displayCanvas.height / CONFIG.CANVAS.LOGICAL_HEIGHT,
-            0,
-            0
-        );
-    }
-
-    // Update coordinate conversion for input
-    convertToGameCoordinates(clientX, clientY) {
-        const rect = this.displayCanvas.getBoundingClientRect();
-        return {
-            x: (clientX - rect.left) * this.scaleX,
-            y: (clientY - rect.top) * this.scaleY
         };
     }
 }
