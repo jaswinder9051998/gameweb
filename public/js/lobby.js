@@ -6,16 +6,19 @@ import { CONFIG } from './config.js';
 let socket;
 try {
     socket = io(CONFIG.SERVER.URL, {
-        transports: ['polling', 'websocket'],  // Try polling first, then websocket
-        upgrade: true,
+        transports: ['polling'],  // Start with polling only
+        upgrade: false,           // Disable transport upgrade for now
         reconnection: true,
-        reconnectionAttempts: 5,
+        reconnectionAttempts: 10,
         reconnectionDelay: 1000,
-        timeout: 20000,
+        timeout: 60000,
         forceNew: true,
         path: '/socket.io',
-        withCredentials: false,  // Explicitly disable credentials
-        rejectUnauthorized: false  // Allow self-signed certificates
+        withCredentials: false,
+        rejectUnauthorized: false,
+        query: {
+            "transport": "polling"
+        }
     });
 
     socket.on('connect', () => {

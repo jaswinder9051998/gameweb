@@ -4,22 +4,23 @@ const http = require('http');
 const server = http.createServer(app);
 const { Server } = require('socket.io');
 
-// Configure Socket.IO with more permissive CORS
+// Configure Socket.IO with more permissive CORS and polling settings
 const io = new Server(server, {
     cors: {
         origin: "*",
-        methods: ["GET", "POST"],
+        methods: ["GET", "POST", "OPTIONS"],
         allowedHeaders: ["*"],
-        credentials: false  // Match client setting
+        credentials: false
     },
-    transports: ['polling', 'websocket'],  // Match client order
     allowEIO3: true,
-    path: '/socket.io',
-    pingTimeout: 30000,
+    transports: ['polling', 'websocket'],
+    pingTimeout: 60000,
     pingInterval: 25000,
     upgradeTimeout: 10000,
     allowUpgrades: true,
-    cookie: false
+    cookie: false,
+    connectTimeout: 45000,
+    maxHttpBufferSize: 1e8
 });
 
 const PORT = process.env.PORT || 3000;
@@ -28,13 +29,18 @@ const PORT = process.env.PORT || 3000;
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Headers', '*');
+    
+    // Handle preflight requests
     if (req.method === 'OPTIONS') {
-        res.sendStatus(200);
-    } else {
-        next();
+        return res.status(200).end();
     }
+    next();
+});
+
+// Add health check endpoint
+app.get('/health', (req, res) => {
+    res.status(200).send('OK');
 });
 
 // Serve static files from the "public" folder
@@ -200,8 +206,25 @@ function generateRoomId(length = 6) {
     return result;
 }
 
-// Start server with logging
-server.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-    console.log(`WebSocket server is ready`);
+// Start server with error handling
+server.listen(process.env.PORT || 10000, '0.0.0.0', (err) => {
+    if (err) {
+        console.error('Server failed to start:', err);
+        return;
+    }
+    console.log(`Server is running on port ${process.env.PORT || 10000}`);
+    console.log('WebSocket server is ready');
+});
+
+// Handle server errors
+server.on('error', (err) => {
+    console.error('Server error:', err);
+});
+
+process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 }); 
