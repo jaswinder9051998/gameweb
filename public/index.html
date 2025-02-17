@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Puck Thrower Game</title>
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+    <!-- Lobby overlay -->
+    <div id="lobby-overlay" class="lobby-overlay">
+        <div class="lobby-content">
+            <h1>Puck Thrower Game</h1>
+            
+            <!-- Game Mode Selection -->
+            <div class="mode-selection">
+                <h2>Select Game Mode</h2>
+                <div class="mode-buttons">
+                    <button id="collision-mode" class="mode-button selected">
+                        Collision Mode
+                        <span class="mode-description">Score points by hitting opponent's pucks</span>
+                    </button>
+                    <button id="territory-mode" class="mode-button">
+                        Territory Mode
+                        <span class="mode-description">Control territory and score through collisions</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="lobby-controls">
+                <button id="create-room-btn" class="lobby-button">Create New Room</button>
+                <div class="join-room-container">
+                    <input type="text" id="room-key-input" placeholder="Enter Room Key" class="room-input">
+                    <button id="join-room-btn" class="lobby-button">Join Room</button>
+                </div>
+            </div>
+            <div id="lobby-message" class="lobby-message"></div>
+        </div>
+    </div>
+
+    <!-- Game container (hidden initially) -->
+    <div id="game-container" style="position: relative; display: none;">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <!-- Socket.IO client -->
+    <script src="/socket.io/socket.io.js"></script>
+    <!-- Game scripts -->
+    <script type="module" src="js/lobby.js"></script>
+    <script type="module" src="js/game.js"></script>
+</body>
+</html> 

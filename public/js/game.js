@@ -1,14 +1,22 @@
 import { CONFIG } from './config.js';
 
 class Game {
-    constructor() {
+    constructor(playerNumber, socket, roomId, gameMode) {
+        this.playerNumber = playerNumber;
+        this.socket = socket;
+        this.roomId = roomId;
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
-        this.init();
+        this.init(gameMode);
         this.setupEventListeners();
+        
+        // Listen for game updates from server
+        this.socket.on('gameUpdated', (data) => {
+            this.handleGameUpdate(data);
+        });
     }
 
-    init() {
+    init(gameMode) {
         // Set canvas size from config
         this.canvas.width = CONFIG.CANVAS.WIDTH;
         this.canvas.height = CONFIG.CANVAS.HEIGHT;
@@ -28,12 +36,12 @@ class Game {
             currentPuck: null,
             isCharging: false,
             chargeStartTime: null,
-            rotationCenter: null, // Store the initial click point
-            rotationRadius: 40,   // Distance from center to rotating puck
-            rotationAngle: 0,     // Current angle of rotation
-            crossTeamCollisionsOnly: true,  // New state for collision mode
-            sparks: [],  // Array to hold active spark particles
-            scorePopups: [],  // Array to hold score popups
+            rotationCenter: null,
+            rotationRadius: 40,
+            rotationAngle: 0,
+            crossTeamCollisionsOnly: true,
+            sparks: [],
+            scorePopups: [],
             gameEnded: false,
             winner: null,
             sounds: {
@@ -42,13 +50,13 @@ class Game {
                 score: new Audio('sounds/score.mp3'),
                 win: new Audio('sounds/win.mp3')
             },
-            gameMode: CONFIG.GAME_MODES.COLLISION,
+            gameMode: gameMode || CONFIG.GAME_MODES.COLLISION,
             territoryGrid: this.createTerritoryGrid()
         };
 
-        this.createCollisionToggleButton();
         this.createPlayAgainButton();
-        this.createGameModeButton();
+        
+        console.log('Game initialized in mode:', gameMode);
         this.gameLoop();
     }
 
@@ -84,6 +92,14 @@ class Game {
             this.gameState.isCharging = true;
             this.gameState.chargeStartTime = Date.now();
             this.gameState.rotationAngle = 0;
+            
+            // Create a temporary puck for charging animation
+            this.gameState.currentPuck = {
+                x: x + Math.cos(this.gameState.rotationAngle) * this.gameState.rotationRadius,
+                y: y + Math.sin(this.gameState.rotationAngle) * this.gameState.rotationRadius,
+                player: this.gameState.activePlayer,
+                isCharging: true  // Add this flag to identify charging pucks
+            };
         }
     }
 
@@ -94,6 +110,9 @@ class Game {
     }
 
     isValidPlacement(x, y) {
+        if (this.gameState.activePlayer !== this.playerNumber) {
+            return false; // Not this player's turn
+        }
         // First turn for either player - allow placement anywhere
         if (this.gameState.puckCounts.player1 === 0 || this.gameState.puckCounts.player2 === 0) {
             return this.isWithinBounds(x, y) && !this.isInRestrictedZone(x, y);
@@ -173,9 +192,24 @@ class Game {
             y: launchDirection.y * launchSpeed
         };
 
-        this.gameState.currentPuck.vx = velocity.x;
-        this.gameState.currentPuck.vy = velocity.y;
-        this.gameState.pucks.push(this.gameState.currentPuck);
+        // Create the final puck object with velocity
+        const launchedPuck = {
+            x: this.gameState.currentPuck.x,
+            y: this.gameState.currentPuck.y,
+            vx: velocity.x,
+            vy: velocity.y,
+            player: this.gameState.activePlayer
+        };
+
+        // Send the puck launch data to the server
+        this.socket.emit('gameMove', {
+            roomId: this.roomId,
+            type: 'launch',
+            puck: launchedPuck
+        });
+
+        // Update local game state with the launched puck
+        this.gameState.pucks.push(launchedPuck);
         this.gameState.puckCounts[`player${this.gameState.activePlayer}`]++;
         
         // Reset charging state
@@ -262,30 +296,49 @@ class Game {
             
             // Calculate current puck position based on rotation
             const center = this.gameState.rotationCenter;
-            const x = center.x + Math.cos(this.gameState.rotationAngle) * this.gameState.rotationRadius;
-            const y = center.y + Math.sin(this.gameState.rotationAngle) * this.gameState.rotationRadius;
-            
-            this.gameState.currentPuck = {
-                x, y,
-                player: this.gameState.activePlayer
-            };
+            if (this.gameState.currentPuck) {
+                this.gameState.currentPuck.x = center.x + Math.cos(this.gameState.rotationAngle) * this.gameState.rotationRadius;
+                this.gameState.currentPuck.y = center.y + Math.sin(this.gameState.rotationAngle) * this.gameState.rotationRadius;
+            }
         }
 
         // Update moving pucks
         this.gameState.pucks.forEach(puck => {
             if (puck.vx || puck.vy) {
+                // Update position
                 puck.x += puck.vx;
                 puck.y += puck.vy;
+
+                // Wall collisions with speed reduction
+                const wallDamping = 0.7; // Reduce speed by 30% on wall hits
                 
-                puck.vx *= CONFIG.PHYSICS.FRICTION;
-                puck.vy *= CONFIG.PHYSICS.FRICTION;
-                
-                if (Math.abs(puck.vx) < 0.1 && Math.abs(puck.vy) < 0.1) {
-                    puck.vx = 0;
-                    puck.vy = 0;
+                // Left and right walls
+                if (puck.x - CONFIG.PUCK.RADIUS < 0) {
+                    puck.x = CONFIG.PUCK.RADIUS;
+                    puck.vx = -puck.vx * wallDamping;
+                } else if (puck.x + CONFIG.PUCK.RADIUS > this.canvas.width) {
+                    puck.x = this.canvas.width - CONFIG.PUCK.RADIUS;
+                    puck.vx = -puck.vx * wallDamping;
                 }
                 
-                this.handleWallCollisions(puck);
+                // Top and bottom walls
+                if (puck.y - CONFIG.PUCK.RADIUS < 0) {
+                    puck.y = CONFIG.PUCK.RADIUS;
+                    puck.vy = -puck.vy * wallDamping;
+                } else if (puck.y + CONFIG.PUCK.RADIUS > this.canvas.height) {
+                    puck.y = this.canvas.height - CONFIG.PUCK.RADIUS;
+                    puck.vy = -puck.vy * wallDamping;
+                }
+
+                // Apply friction
+                puck.vx *= CONFIG.PHYSICS.FRICTION;
+                puck.vy *= CONFIG.PHYSICS.FRICTION;
+
+                // Stop very slow movement
+                if (Math.abs(puck.vx) < 0.01) puck.vx = 0;
+                if (Math.abs(puck.vy) < 0.01) puck.vy = 0;
+
+                // Handle collisions with other pucks
                 this.handlePuckCollisions(puck);
             }
         });
@@ -396,67 +449,88 @@ class Game {
         }
     }
 
-    handlePuckCollisions(puck1) {
-        this.gameState.pucks.forEach(puck2 => {
-            if (puck1 === puck2) return; // Skip self
+    handlePuckCollisions(puck) {
+        for (let i = 0; i < this.gameState.pucks.length; i++) {
+            const otherPuck = this.gameState.pucks[i];
+            if (puck === otherPuck) continue;
 
-            // Check if collision should be processed based on mode
-            if (this.gameState.crossTeamCollisionsOnly && puck1.player === puck2.player) {
-                return; // Skip same-team collisions in cross-team mode
-            }
-
-            const dx = puck2.x - puck1.x;
-            const dy = puck2.y - puck1.y;
+            const dx = puck.x - otherPuck.x;
+            const dy = puck.y - otherPuck.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
-            
-            // Check if pucks are overlapping
-            if (distance < CONFIG.PUCK.RADIUS * 2) {
-                // Calculate relative velocity
-                const vx = (puck1.vx || 0) - (puck2.vx || 0);
-                const vy = (puck1.vy || 0) - (puck2.vy || 0);
-                const speed = Math.sqrt(vx * vx + vy * vy);
 
-                // Calculate collision force for scoring first
-                if (speed > 1) {  // Increased threshold
-                    this.handleCollisionScore(puck1, puck2, speed);
+            if (distance < CONFIG.PUCK.RADIUS * 2) {
+                // Only emit collision if this is the active player
+                if (this.gameState.activePlayer === this.playerNumber) {
+                    this.socket.emit('gameMove', {
+                        roomId: this.roomId,
+                        type: 'collision',
+                        puck1: {
+                            x: puck.x,
+                            y: puck.y,
+                            vx: puck.vx || 0,
+                            vy: puck.vy || 0
+                        },
+                        puck2: {
+                            x: otherPuck.x,
+                            y: otherPuck.y,
+                            vx: otherPuck.vx || 0,
+                            vy: otherPuck.vy || 0
+                        }
+                    });
                 }
 
-                // Calculate collision normal
+                // Calculate relative velocity
+                const vx = (puck.vx || 0) - (otherPuck.vx || 0);
+                const vy = (puck.vy || 0) - (otherPuck.vy || 0);
+                const speed = Math.sqrt(vx * vx + vy * vy);
+
+                // Calculate collision force for scoring
+                if (speed > 1) {
+                    this.handleCollisionScore(puck, otherPuck, speed);
+                }
+
+                // Normalize collision normal
                 const nx = dx / distance;
                 const ny = dy / distance;
-                
+
                 // Calculate relative velocity in terms of normal direction
                 const velocityAlongNormal = vx * nx + vy * ny;
-                
-                // Don't resolve if objects are moving apart
+
+                // Don't resolve collision if pucks are moving apart
                 if (velocityAlongNormal > 0) return;
-                
-                // Calculate restitution (bounciness)
+
+                // Calculate impulse scalar with reduced transfer
                 const restitution = CONFIG.PHYSICS.COLLISION_ELASTICITY;
-                
-                // Calculate impulse scalar
-                const j = -(1 + restitution) * velocityAlongNormal;
-                
-                // Apply impulse
-                if (!puck2.vx) puck2.vx = 0;
-                if (!puck2.vy) puck2.vy = 0;
-                
-                puck1.vx = puck1.vx - j * nx;
-                puck1.vy = puck1.vy - j * ny;
-                puck2.vx = puck2.vx + j * nx;
-                puck2.vy = puck2.vy + j * ny;
-                
-                // Separate the pucks (prevent sticking)
+                const impulseMagnitude = -(1 + restitution) * velocityAlongNormal * 0.5; // Added 0.5 factor
+
+                // Apply impulse with momentum conservation
+                const totalMass = 2; // Both pucks have mass of 1
+                const puck1Ratio = 1 / totalMass;
+                const puck2Ratio = 1 / totalMass;
+
+                // Apply impulse with mass ratios
+                puck.vx = (puck.vx || 0) - (impulseMagnitude * nx * puck1Ratio);
+                puck.vy = (puck.vy || 0) - (impulseMagnitude * ny * puck1Ratio);
+                otherPuck.vx = (otherPuck.vx || 0) + (impulseMagnitude * nx * puck2Ratio);
+                otherPuck.vy = (otherPuck.vy || 0) + (impulseMagnitude * ny * puck2Ratio);
+
+                // Additional velocity dampening for the receiving puck
+                if (!otherPuck.vx && !otherPuck.vy) { // If it was stationary
+                    otherPuck.vx *= 0.4; // Reduce transferred velocity by 60%
+                    otherPuck.vy *= 0.4;
+                }
+
+                // Separate the pucks to prevent sticking
                 const overlap = (CONFIG.PUCK.RADIUS * 2) - distance;
                 const separationX = (overlap * nx) / 2;
                 const separationY = (overlap * ny) / 2;
                 
-                puck1.x -= separationX;
-                puck1.y -= separationY;
-                puck2.x += separationX;
-                puck2.y += separationY;
+                puck.x -= separationX;
+                puck.y -= separationY;
+                otherPuck.x += separationX;
+                otherPuck.y += separationY;
             }
-        });
+        }
     }
 
     handleCollisionScore(puck1, puck2, force) {
@@ -521,9 +595,10 @@ class Game {
         // Clear canvas
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         
-        // Draw territory first (bottom layer)
+        // Draw territory if in territory mode
         if (this.gameState.gameMode === CONFIG.GAME_MODES.TERRITORY) {
             this.drawTerritory();
+            console.log('Drawing territory');
         }
         
         // Draw game board
@@ -593,10 +668,21 @@ class Game {
             );
         }
         
-        // Draw all placed pucks
+        // Draw all pucks (including both players' pucks)
         this.gameState.pucks.forEach(puck => {
-            this.drawPuck(puck.x, puck.y, puck.player);
+            if (!puck.isCharging) {  // Only draw non-charging pucks
+                this.drawPuck(puck.x, puck.y, puck.player);
+            }
         });
+
+        // Draw the currently charging puck if it exists
+        if (this.gameState.isCharging && this.gameState.currentPuck) {
+            this.drawPuck(
+                this.gameState.currentPuck.x,
+                this.gameState.currentPuck.y,
+                this.gameState.currentPuck.player
+            );
+        }
 
         // Draw scoreboard
         this.drawScoreboard();
@@ -776,33 +862,6 @@ class Game {
         }
         
         this.ctx.restore();
-    }
-
-    createCollisionToggleButton() {
-        const button = document.createElement('button');
-        button.style.position = 'absolute';
-        button.style.top = '10px';
-        button.style.right = '10px';
-        button.style.padding = '8px 16px';
-        button.style.cursor = 'pointer';
-        button.style.backgroundColor = '#4CAF50';
-        button.style.border = 'none';
-        button.style.borderRadius = '4px';
-        button.style.color = 'white';
-        this.updateCollisionButtonText(button);
-
-        button.addEventListener('click', () => {
-            this.gameState.crossTeamCollisionsOnly = !this.gameState.crossTeamCollisionsOnly;
-            this.updateCollisionButtonText(button);
-        });
-
-        this.canvas.parentElement.appendChild(button);
-    }
-
-    updateCollisionButtonText(button) {
-        button.textContent = this.gameState.crossTeamCollisionsOnly ? 
-            'Mode: Cross-Team Only' : 
-            'Mode: All Collisions';
     }
 
     drawLaunchDirectionArrow(puck, center) {
@@ -1024,12 +1083,19 @@ class Game {
     }
 
     resetGame() {
+        // Emit reset event to server
+        this.socket.emit('gameMove', {
+            roomId: this.roomId,
+            type: 'reset'
+        });
+
+        // Reset local game state
         this.gameState = {
             ...this.gameState,
             pucks: [],
             activePlayer: 1,
             scores: { player1: 0, player2: 0 },
-            collisionScores: { player1: 0, player2: 0 }, // Reset collision scores
+            collisionScores: { player1: 0, player2: 0 },
             puckCounts: { player1: 0, player2: 0 },
             currentPuck: null,
             isCharging: false,
@@ -1039,35 +1105,6 @@ class Game {
             winner: null
         };
         this.playAgainButton.style.display = 'none';
-    }
-
-    createGameModeButton() {
-        const button = document.createElement('button');
-        button.style.position = 'absolute';
-        button.style.top = '10px';
-        button.style.right = '200px';
-        button.style.padding = '8px 16px';
-        button.style.cursor = 'pointer';
-        button.style.backgroundColor = '#4CAF50';
-        button.style.border = 'none';
-        button.style.borderRadius = '4px';
-        button.style.color = 'white';
-        this.updateGameModeButtonText(button);
-
-        button.addEventListener('click', () => {
-            this.gameState.gameMode = this.gameState.gameMode === CONFIG.GAME_MODES.COLLISION ? 
-                CONFIG.GAME_MODES.TERRITORY : CONFIG.GAME_MODES.COLLISION;
-            this.updateGameModeButtonText(button);
-            this.resetGame();
-        });
-
-        this.canvas.parentElement.appendChild(button);
-        this.gameModeButton = button;
-    }
-
-    updateGameModeButtonText(button) {
-        button.textContent = `Mode: ${this.gameState.gameMode === CONFIG.GAME_MODES.COLLISION ? 
-            'Collision' : 'Territory'}`;
     }
 
     createTerritoryGrid() {
@@ -1203,9 +1240,57 @@ class Game {
             this.drawPuck(puck.x, puck.y, puck.player);
         });
     }
+
+    handleGameUpdate(data) {
+        if (data.type === 'launch') {
+            // Add the new puck to our game state
+            this.gameState.pucks.push(data.puck);
+            this.gameState.puckCounts[`player${data.puck.player}`]++;
+            
+            // Update active player
+            this.gameState.activePlayer = data.currentTurn === 'player1' ? 1 : 2;
+        } 
+        else if (data.type === 'collision') {
+            // Find the corresponding pucks in our game state
+            const localPuck1 = this.gameState.pucks.find(p => 
+                Math.abs(p.x - data.puck1.x) < 0.1 && 
+                Math.abs(p.y - data.puck1.y) < 0.1
+            );
+            const localPuck2 = this.gameState.pucks.find(p => 
+                Math.abs(p.x - data.puck2.x) < 0.1 && 
+                Math.abs(p.y - data.puck2.y) < 0.1
+            );
+
+            if (localPuck1 && localPuck2) {
+                // Update with velocities from collision moment
+                localPuck1.vx = data.puck1.vx;
+                localPuck1.vy = data.puck1.vy;
+                localPuck2.vx = data.puck2.vx;
+                localPuck2.vy = data.puck2.vy;
+            }
+        }
+        else if (data.type === 'reset') {
+            // Reset local game state when receiving reset from server
+            this.gameState = {
+                ...this.gameState,
+                pucks: [],
+                activePlayer: 1,
+                scores: { player1: 0, player2: 0 },
+                collisionScores: { player1: 0, player2: 0 },
+                puckCounts: { player1: 0, player2: 0 },
+                currentPuck: null,
+                isCharging: false,
+                chargeStartTime: null,
+                rotationCenter: null,
+                gameEnded: false,
+                winner: null
+            };
+            this.playAgainButton.style.display = 'none';
+        }
+    }
 }
 
-// Start the game when the page loads
-window.addEventListener('load', () => {
-    new Game();
-}); 
+// Modify the startGame function to accept player info
+window.startGame = function(playerNumber, socket, roomId, gameMode) {
+    new Game(playerNumber, socket, roomId, gameMode);
+}; 
