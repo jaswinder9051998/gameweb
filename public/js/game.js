@@ -26,6 +26,11 @@ class Game {
         
         // Add window resize handler
         window.addEventListener('resize', () => this.updateCanvasDisplay());
+
+        // Add state for two-step input
+        this.inputState = {
+            isPlacing: false,  // Track if we're in placement phase
+        };
     }
 
     init(gameMode) {
@@ -99,9 +104,11 @@ class Game {
     }
 
     setupEventListeners() {
+        // Modify mouse event listeners for two-step approach
+        this.canvas.addEventListener('mousedown', (e) => this.handleInputStart(e));
         this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
-        this.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
-        this.canvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+        // Remove mouseup listener as we don't need it anymore
+        
         window.addEventListener('resize', () => {
             this.updateCanvasDisplay();
         });
@@ -125,42 +132,71 @@ class Game {
         );
     }
 
+    handleInputStart(e) {
+        e.preventDefault();
+        if (this.gameState.gameEnded) return;
+
+        console.log('Input start', {
+            activePlayer: this.gameState.activePlayer,
+            playerNumber: this.playerNumber,
+            isCharging: this.gameState.isCharging,
+            isPlacing: this.inputState.isPlacing,
+            hasPuck: !!this.gameState.currentPuck,
+            puckCounts: this.gameState.puckCounts
+        });
+
+        // Only check player turn for the first click (placement)
+        // Allow second click (launch) regardless of turn
+        if (!this.gameState.isCharging && this.gameState.activePlayer !== this.playerNumber) {
+            console.log('Not your turn');
+            return;
+        }
+
+        const coords = this.normalizeCoordinates(
+            e.clientX || e.touches[0].clientX,
+            e.clientY || e.touches[0].clientY
+        );
+
+        // First click/touch - Place the puck
+        if (!this.gameState.isCharging && !this.gameState.currentPuck) {
+            if (this.isValidPlacement(coords.x, coords.y)) {
+                // Check puck count
+                if (this.gameState.puckCounts[`player${this.playerNumber}`] >= CONFIG.PUCK.MAX_PUCKS_PER_PLAYER) {
+                    console.log('Max pucks reached');
+                    return;
+                }
+
+                this.gameState.rotationCenter = coords;
+                this.gameState.isCharging = true;
+                this.gameState.chargeStartTime = Date.now();
+                this.gameState.rotationAngle = 0;
+                
+                this.gameState.currentPuck = {
+                    x: coords.x + Math.cos(this.gameState.rotationAngle) * this.gameState.rotationRadius,
+                    y: coords.y + Math.sin(this.gameState.rotationAngle) * this.gameState.rotationRadius,
+                    player: this.playerNumber, // Use playerNumber instead of activePlayer
+                    isCharging: true
+                };
+                this.inputState.isPlacing = true;
+
+                // Add small delay before allowing launch
+                setTimeout(() => {
+                    this.inputState.isPlacing = false;
+                    console.log('Ready for launch');
+                }, 100);
+            }
+        }
+        // Second click/touch - Launch the puck
+        else if (this.gameState.isCharging && !this.inputState.isPlacing) {
+            console.log('Launching puck');
+            this.launchPuck();
+        }
+    }
+
     handleMouseMove(e) {
         if (!this.gameState.isCharging) {
             const coords = this.normalizeCoordinates(e.clientX, e.clientY);
             this.previewPuckPosition = coords;
-        }
-    }
-
-    handleMouseDown(e) {
-        if (this.gameState.gameEnded || this.gameState.currentPuck) return;
-
-        const coords = this.normalizeCoordinates(e.clientX, e.clientY);
-        
-        // Check if player has pucks remaining
-        if (this.gameState.puckCounts[`player${this.gameState.activePlayer}`] >= CONFIG.PUCK.MAX_PUCKS_PER_PLAYER) {
-            return;
-        }
-
-        if (this.isValidPlacement(coords.x, coords.y)) {
-            this.gameState.rotationCenter = coords;
-            this.gameState.isCharging = true;
-            this.gameState.chargeStartTime = Date.now();
-            this.gameState.rotationAngle = 0;
-            
-            // Create a temporary puck for charging animation
-            this.gameState.currentPuck = {
-                x: coords.x + Math.cos(this.gameState.rotationAngle) * this.gameState.rotationRadius,
-                y: coords.y + Math.sin(this.gameState.rotationAngle) * this.gameState.rotationRadius,
-                player: this.gameState.activePlayer,
-                isCharging: true
-            };
-        }
-    }
-
-    handleMouseUp(e) {
-        if (this.gameState.isCharging) {
-            this.launchPuck();
         }
     }
 
@@ -274,13 +310,8 @@ class Game {
         this.gameState.chargeStartTime = null;
         this.gameState.rotationCenter = null;
         
-        // Check for game end conditions
-        if (this.checkGameEnd()) {
-            this.endGame();
-        } else {
-            // Switch active player
-            this.gameState.activePlayer = this.gameState.activePlayer === 1 ? 2 : 1;
-        }
+        // Switch active player
+        this.gameState.activePlayer = this.gameState.activePlayer === 1 ? 2 : 1;
 
         if (this.gameState.sounds.launch) {
             this.gameState.sounds.launch.play();
@@ -292,14 +323,21 @@ class Game {
         const allPucksUsed = Object.values(this.gameState.puckCounts)
             .every(count => count >= CONFIG.PUCK.MAX_PUCKS_PER_PLAYER);
         
-        if (allPucksUsed) return true;
-
-        // Check if active player has any valid placement positions
-        if (this.gameState.puckCounts[`player${this.gameState.activePlayer}`] < CONFIG.PUCK.MAX_PUCKS_PER_PLAYER) {
-            return !this.hasValidPlacement();
+        if (!allPucksUsed) {
+            return false;
         }
 
-        return false;
+        // Check if any pucks are still moving
+        const pucksMoving = this.gameState.pucks.some(puck => 
+            (Math.abs(puck.vx) > 0.01 || Math.abs(puck.vy) > 0.01)
+        );
+
+        if (pucksMoving) {
+            return false;
+        }
+
+        // All pucks used and no pucks moving - now we can end
+        return true;
     }
 
     hasValidPlacement() {
@@ -318,7 +356,12 @@ class Game {
     endGame() {
         this.gameState.gameEnded = true;
         
-        // Determine winner
+        // Update territory scores one final time
+        if (this.gameState.gameMode === CONFIG.GAME_MODES.TERRITORY) {
+            this.updateTerritoryScores();
+        }
+        
+        // Determine winner based on final scores
         if (this.gameState.scores.player1 > this.gameState.scores.player2) {
             this.gameState.winner = 1;
         } else if (this.gameState.scores.player2 > this.gameState.scores.player1) {
@@ -433,6 +476,20 @@ class Game {
 
         // Update territory scores
         this.updateTerritoryScores();
+
+        // Check for game end only if all pucks are used
+        if (Object.values(this.gameState.puckCounts)
+            .every(count => count >= CONFIG.PUCK.MAX_PUCKS_PER_PLAYER)) {
+            
+            // Check if any pucks are still moving
+            const pucksMoving = this.gameState.pucks.some(puck => 
+                (Math.abs(puck.vx) > 0.01 || Math.abs(puck.vy) > 0.01)
+            );
+
+            if (!pucksMoving && !this.gameState.gameEnded) {
+                this.endGame();
+            }
+        }
     }
 
     handleWallCollisions(puck) {
@@ -753,6 +810,20 @@ class Game {
 
         // Draw sparks last (top layer)
         this.drawSparks();
+
+        // Add indicator text when puck is placed and waiting for launch
+        if (this.gameState.isCharging && this.gameState.currentPuck) {
+            this.ctx.save();
+            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            this.ctx.font = '20px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText(
+                'Tap anywhere to launch!',
+                CONFIG.CANVAS.WIDTH / 2,
+                CONFIG.CANVAS.HEIGHT - 30
+            );
+            this.ctx.restore();
+        }
     }
 
     drawBoard() {
@@ -1353,66 +1424,18 @@ class Game {
 
     // Add this method to the Game class
     initializeTouchControls() {
-        let touchStartTime = 0;
-        let isTouching = false;
-
-        this.canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            if (this.gameState.gameEnded || this.gameState.currentPuck) return;
-            if (this.gameState.activePlayer !== this.playerNumber) return;
-
-            isTouching = true;
-            touchStartTime = Date.now();
-            const touch = e.touches[0];
-            const coords = this.normalizeCoordinates(touch.clientX, touch.clientY);
-
-            if (this.isValidPlacement(coords.x, coords.y)) {
-                this.gameState.rotationCenter = coords;
-                this.gameState.isCharging = true;
-                this.gameState.chargeStartTime = Date.now();
-                this.gameState.rotationAngle = 0;
-                
-                this.gameState.currentPuck = {
-                    x: coords.x + Math.cos(this.gameState.rotationAngle) * this.gameState.rotationRadius,
-                    y: coords.y + Math.sin(this.gameState.rotationAngle) * this.gameState.rotationRadius,
-                    player: this.gameState.activePlayer,
-                    isCharging: true
-                };
-            }
-        }, { passive: false });
-
-        this.canvas.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            if (isTouching && this.gameState.isCharging) {
-                const touch = e.touches[0];
-                const coords = this.normalizeCoordinates(touch.clientX, touch.clientY);
-                
-                // Update the preview position
-                if (this.gameState.currentPuck) {
-                    this.gameState.currentPuck.x = coords.x + Math.cos(this.gameState.rotationAngle) * this.gameState.rotationRadius;
-                    this.gameState.currentPuck.y = coords.y + Math.sin(this.gameState.rotationAngle) * this.gameState.rotationRadius;
-                }
-            }
-        }, { passive: false });
+        this.canvas.addEventListener('touchstart', (e) => this.handleInputStart(e), { passive: false });
 
         this.canvas.addEventListener('touchend', (e) => {
             e.preventDefault();
-            if (isTouching && this.gameState.isCharging) {
-                // Use existing launch logic
-                this.launchPuck();
-            }
-            isTouching = false;
         }, { passive: false });
 
         this.canvas.addEventListener('touchcancel', (e) => {
             e.preventDefault();
-            if (this.gameState.isCharging) {
-                this.gameState.isCharging = false;
-                this.gameState.currentPuck = null;
-                this.gameState.chargeStartTime = null;
-                this.gameState.rotationCenter = null;
-            }
-            isTouching = false;
+            // Only reset on cancel
+            this.inputState.isPlacing = false;
+            this.gameState.isCharging = false;
+            this.gameState.currentPuck = null;
         }, { passive: false });
     }
 
