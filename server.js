@@ -10,11 +10,22 @@ const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
         origin: "*",
-        methods: ["GET", "POST"]
+        methods: ["GET", "POST"],
+        credentials: true
     },
-    transports: ['websocket', 'polling'], // Try websocket first, fallback to polling
-    pingTimeout: 60000, // Increase ping timeout for better stability
-    pingInterval: 25000 // Adjust ping interval
+    allowEIO3: true,
+    transports: ['websocket', 'polling'],
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    upgradeTimeout: 30000,
+    maxHttpBufferSize: 1e8,
+    path: '/socket.io/',
+    // Add connection policies
+    connectTimeout: 45000,
+    // Add better polling settings
+    polling: {
+        requestTimeout: 60000
+    }
 });
 
 const PORT = process.env.PORT || 3000;
@@ -22,10 +33,11 @@ const PORT = process.env.PORT || 3000;
 // Enable CORS for all routes with more permissive settings
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
-    res.header('Access-Control-Allow-Headers', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    res.header('Access-Control-Allow-Credentials', 'true');
     
-    // Handle preflight requests
+    // Handle preflight
     if (req.method === 'OPTIONS') {
         return res.status(200).end();
     }
@@ -34,7 +46,11 @@ app.use((req, res, next) => {
 
 // Add health check endpoint
 app.get('/health', (req, res) => {
-    res.status(200).send('OK');
+    res.status(200).json({
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+    });
 });
 
 // Serve static files from the "public" folder
@@ -206,8 +222,13 @@ server.listen(PORT, () => {
 });
 
 // Handle server errors
-server.on('error', (err) => {
-    console.error('Server error:', err);
+server.on('error', (error) => {
+    console.error('Server error:', error);
+});
+
+// Add error handling for Socket.IO
+io.engine.on('connection_error', (err) => {
+    console.error('Connection error:', err);
 });
 
 process.on('uncaughtException', (err) => {
