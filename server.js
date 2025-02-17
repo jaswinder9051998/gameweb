@@ -3,24 +3,36 @@ const app = express();
 const http = require('http');
 const server = http.createServer(app);
 const { Server } = require('socket.io');
+
+// Configure Socket.IO with more permissive CORS
 const io = new Server(server, {
     cors: {
         origin: "*",
-        methods: ["GET", "POST"]
-    }
+        methods: ["GET", "POST"],
+        allowedHeaders: ["*"],
+        credentials: true
+    },
+    transports: ['websocket', 'polling'],
+    allowEIO3: true,
+    path: '/socket.io'  // Make sure path matches client
 });
 
 const PORT = process.env.PORT || 3000;
 
-// Enable CORS for all routes
+// Enable CORS for all routes with more permissive settings
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-    next();
+    res.header('Access-Control-Allow-Credentials', 'true');
+    if (req.method === 'OPTIONS') {
+        res.sendStatus(200);
+    } else {
+        next();
+    }
 });
 
-// Serve static files from the "public" folder.
+// Serve static files from the "public" folder
 app.use(express.static('public'));
 
 // Basic route to serve index.html
@@ -183,7 +195,8 @@ function generateRoomId(length = 6) {
     return result;
 }
 
-// Start the server.
+// Start server with logging
 server.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
+    console.log(`WebSocket server is ready`);
 }); 

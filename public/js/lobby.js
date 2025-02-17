@@ -9,25 +9,38 @@ try {
         transports: ['websocket', 'polling'],
         upgrade: true,
         reconnection: true,
-        reconnectionAttempts: 5
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+        timeout: 20000,
+        forceNew: true,
+        path: '/socket.io'
     });
 
     socket.on('connect', () => {
         console.log('Connected to server');
+        console.log('Socket ID:', socket.id);
         enableButtons(true);
+        lobbyMessage.textContent = 'Connected to server';
     });
 
     socket.on('connect_error', (error) => {
         console.error('Connection error:', error);
-        lobbyMessage.textContent = 'Connection error. Please try again.';
+        console.log('Attempting to connect to:', CONFIG.SERVER.URL);
+        lobbyMessage.textContent = `Connection error: ${error.message}. Retrying...`;
         enableButtons(false);
     });
 
-    socket.on('disconnect', () => {
-        console.log('Disconnected from server');
-        lobbyMessage.textContent = 'Disconnected from server. Trying to reconnect...';
+    socket.on('disconnect', (reason) => {
+        console.log('Disconnected from server. Reason:', reason);
+        lobbyMessage.textContent = `Disconnected: ${reason}. Trying to reconnect...`;
         enableButtons(false);
     });
+
+    socket.on('error', (error) => {
+        console.error('Socket error:', error);
+        lobbyMessage.textContent = `Socket error: ${error.message}`;
+    });
+
 } catch (error) {
     console.error('Socket initialization error:', error);
     lobbyMessage.textContent = 'Unable to connect to game server.';
