@@ -1,19 +1,13 @@
 // Initialize socket connection with more aggressive reconnection
 const socket = io(window.location.origin, {
-    reconnection: true,
+    ...window.SOCKET_CONFIG,
+    forceNew: true,
+    rejectUnauthorized: false,
+    secure: true,
     reconnectionAttempts: Infinity,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
-    randomizationFactor: 0.5,
-    timeout: 20000,
-    autoConnect: true,
-    transports: ['polling', 'websocket'], // Changed order to match server
-    upgrade: true,
-    rememberUpgrade: true,
-    path: '/socket.io/',
-    withCredentials: false,
-    forceNew: true,
-    rejectUnauthorized: false
+    randomizationFactor: 0.5
 });
 
 let reconnectAttempts = 0;

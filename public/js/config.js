@@ -54,7 +54,7 @@ export const CONFIG = {
     SERVER: {
         URL: window.location.hostname === 'localhost' 
             ? 'http://localhost:3000' 
-            : 'https://gameweb-qqxr.onrender.com'  // Remove the port number
+            : window.location.origin  // Use the current origin instead of hardcoded URL
     }
 };
 

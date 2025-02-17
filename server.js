@@ -9,7 +9,7 @@ const server = http.createServer(app);
 // Configure Socket.IO with more permissive CORS and polling settings
 const io = new Server(server, {
     cors: {
-        origin: ["https://gameweb-16d7.onrender.com", "https://gameweb-gqxr.onrender.com"],
+        origin: "*", // Allow all origins
         methods: ["GET", "POST", "OPTIONS"],
         credentials: false,
         allowedHeaders: ["*"]
@@ -18,18 +18,10 @@ const io = new Server(server, {
     transports: ['polling', 'websocket'],
     pingTimeout: 30000,
     pingInterval: 10000,
-    upgradeTimeout: 15000,
-    maxHttpBufferSize: 1e8,
     path: '/socket.io/',
     connectTimeout: 30000,
-    polling: {
-        requestTimeout: 30000
-    },
-    allowUpgrades: true,
-    perMessageDeflate: {
-        threshold: 2048
-    },
-    cookie: false
+    cookie: false,
+    allowUpgrades: true
 });
 
 const PORT = process.env.PORT || 3000;
@@ -39,10 +31,11 @@ app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.header('Access-Control-Allow-Headers', '*');
-    res.header('Access-Control-Allow-Credentials', 'false');
     
+    // Handle preflight
     if (req.method === 'OPTIONS') {
-        return res.status(200).end();
+        res.status(200).end();
+        return;
     }
     next();
 });
@@ -240,4 +233,7 @@ process.on('uncaughtException', (err) => {
 
 process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-}); 
+});
+
+// Add this near the top of server.js, before other middleware
+app.enable('trust proxy'); 

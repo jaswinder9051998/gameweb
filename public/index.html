@@ -43,17 +43,17 @@
         <canvas id="gameCanvas"></canvas>
     </div>
 
-    <!-- Update Socket.IO client with specific version -->
+    <!-- Update Socket.IO client -->
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    
-    <!-- Load config before other scripts -->
-    <script type="module" src="js/config.js"></script>
-    
-    <!-- Load game scripts -->
+
+    <!-- Load config first -->
+    <script src="/js/config.js"></script>
+
+    <!-- Then load socket client -->
+    <script src="/js/socket-client.js"></script>
+
+    <!-- Finally load game scripts -->
     <script type="module" src="js/lobby.js"></script>
     <script type="module" src="js/game.js"></script>
-
-    <!-- Add these script tags before closing </body> tag -->
-    <script src="/js/socket-client.js"></script>
 </body>
 </html> 
