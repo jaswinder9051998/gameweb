@@ -82,7 +82,11 @@ const collisionModeBtn = document.getElementById('collision-mode');
 const territoryModeBtn = document.getElementById('territory-mode');
 
 // Track selected mode
-let selectedMode = GAME_MODES.COLLISION;
+let selectedMode = GAME_MODES.TERRITORY;
+
+// Update the initial button states
+collisionModeBtn.classList.remove('selected');  // Remove selection from collision mode
+territoryModeBtn.classList.add('selected');     // Add selection to territory mode
 
 // Add mode selection handlers
 collisionModeBtn.addEventListener('click', () => {

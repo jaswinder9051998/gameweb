@@ -159,6 +159,27 @@ class Game {
 
         // First click/touch - Place the puck
         if (!this.gameState.isCharging && !this.gameState.currentPuck) {
+            // Check if it's territory mode and both players have placed their first pucks
+            if (this.gameState.gameMode === CONFIG.GAME_MODES.TERRITORY &&
+                this.gameState.puckCounts.player1 > 0 && 
+                this.gameState.puckCounts.player2 > 0) {
+                
+                // Check if trying to place in wrong territory
+                const grid = this.calculateTerritory();
+                const col = Math.floor(coords.x / CONFIG.TERRITORY.GRID_SIZE);
+                const row = Math.floor(coords.y / CONFIG.TERRITORY.GRID_SIZE);
+                
+                if (grid[row][col] !== this.playerNumber) {
+                    // Show error message
+                    this.showErrorMessage(
+                        `You can only place in ${this.playerNumber === 1 ? 'red' : 'blue'} territory!`,
+                        coords.x,
+                        coords.y
+                    );
+                    return;
+                }
+            }
+
             if (this.isValidPlacement(coords.x, coords.y)) {
                 // Check puck count
                 if (this.gameState.puckCounts[`player${this.playerNumber}`] >= CONFIG.PUCK.MAX_PUCKS_PER_PLAYER) {
@@ -504,6 +525,25 @@ class Game {
                 this.endGame();
             }
         }
+
+        // Update error messages
+        if (this.gameState.errorMessages) {
+            for (let i = this.gameState.errorMessages.length - 1; i >= 0; i--) {
+                const msg = this.gameState.errorMessages[i];
+                
+                // Only start moving and fading after delay
+                if (msg.delay > 0) {
+                    msg.delay--;
+                } else {
+                    msg.y += msg.vy;
+                    msg.life -= 0.01; // Reduced fade rate (was 0.02)
+                }
+                
+                if (msg.life <= 0) {
+                    this.gameState.errorMessages.splice(i, 1);
+                }
+            }
+        }
     }
 
     handleWallCollisions(puck) {
@@ -824,6 +864,18 @@ class Game {
 
         // Draw sparks last (top layer)
         this.drawSparks();
+
+        // Draw error messages
+        if (this.gameState.errorMessages) {
+            this.gameState.errorMessages.forEach(msg => {
+                this.ctx.save();
+                this.ctx.fillStyle = `rgba(255, 0, 0, ${msg.life})`;
+                this.ctx.font = 'bold 16px Arial';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText(msg.message, msg.x, msg.y);
+                this.ctx.restore();
+            });
+        }
 
         // Add indicator text when puck is placed and waiting for launch
         if (this.gameState.isCharging && this.gameState.currentPuck) {
@@ -1530,6 +1582,30 @@ class Game {
             x: (clientX - rect.left) * (CONFIG.CANVAS.WIDTH / rect.width),
             y: (clientY - rect.top) * (CONFIG.CANVAS.HEIGHT / rect.height)
         };
+    }
+
+    // Add this new method to show error messages
+    showErrorMessage(message, x, y) {
+        // Create a new error popup
+        const errorPopup = {
+            message: message,
+            x: x,
+            y: y - 30, // Show above the click point
+            life: 1.0,
+            vy: -0.5,  // Reduced upward velocity (was -1)
+            delay: 30  // Add delay counter to keep message visible initially
+        };
+
+        // Add to game state if not exists
+        if (!this.gameState.errorMessages) {
+            this.gameState.errorMessages = [];
+        }
+        this.gameState.errorMessages.push(errorPopup);
+
+        // Play error sound if available
+        if (this.gameState.sounds.error) {
+            this.gameState.sounds.error.play();
+        }
     }
 }
 
