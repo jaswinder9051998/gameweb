@@ -52,8 +52,8 @@ export const CONFIG = {
         }
     },
     SERVER: {
-        URL: process.env.NODE_ENV === 'production' 
-            ? 'https://your-render-url.onrender.com' 
-            : 'http://localhost:3000'
+        URL: window.location.hostname === 'localhost' 
+            ? 'http://localhost:3000' 
+            : 'https://gameweb-qqxr.onrender.com'  // Update this with your actual Render URL
     }
 }; 

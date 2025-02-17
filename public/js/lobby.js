@@ -1,9 +1,44 @@
 // This script handles the lobby functionality for room creation and joining.
 
-const socket = io(CONFIG.SERVER.URL, {
-    transports: ['websocket'],
-    upgrade: false
-});
+import { CONFIG } from './config.js';
+
+// Initialize socket with error handling
+let socket;
+try {
+    socket = io(CONFIG.SERVER.URL, {
+        transports: ['websocket', 'polling'],
+        upgrade: true,
+        reconnection: true,
+        reconnectionAttempts: 5
+    });
+
+    socket.on('connect', () => {
+        console.log('Connected to server');
+        enableButtons(true);
+    });
+
+    socket.on('connect_error', (error) => {
+        console.error('Connection error:', error);
+        lobbyMessage.textContent = 'Connection error. Please try again.';
+        enableButtons(false);
+    });
+
+    socket.on('disconnect', () => {
+        console.log('Disconnected from server');
+        lobbyMessage.textContent = 'Disconnected from server. Trying to reconnect...';
+        enableButtons(false);
+    });
+} catch (error) {
+    console.error('Socket initialization error:', error);
+    lobbyMessage.textContent = 'Unable to connect to game server.';
+}
+
+function enableButtons(enabled) {
+    createRoomBtn.disabled = !enabled;
+    joinRoomBtn.disabled = !enabled;
+    collisionModeBtn.disabled = !enabled;
+    territoryModeBtn.disabled = !enabled;
+}
 
 // Get DOM elements for lobby UI
 const createRoomBtn = document.getElementById('create-room-btn');
@@ -31,10 +66,10 @@ let selectedMode = GAME_MODES.COLLISION;
 
 // Add mode selection handlers
 collisionModeBtn.addEventListener('click', () => {
+    console.log('Collision mode clicked');
     selectedMode = GAME_MODES.COLLISION;
     collisionModeBtn.classList.add('selected');
     territoryModeBtn.classList.remove('selected');
-    console.log('Selected mode:', selectedMode); // Debug log
 });
 
 territoryModeBtn.addEventListener('click', () => {
@@ -46,7 +81,15 @@ territoryModeBtn.addEventListener('click', () => {
 
 // When "Create Room" is clicked
 createRoomBtn.addEventListener('click', () => {
-    console.log('Creating room with mode:', selectedMode); // Debug log
+    console.log('Create room clicked');
+    console.log('Selected mode:', selectedMode);
+    console.log('Socket connected:', socket.connected);
+    
+    if (!socket.connected) {
+        lobbyMessage.textContent = 'Not connected to server. Please wait...';
+        return;
+    }
+    
     socket.emit('createRoom', { gameMode: selectedMode });
 });
 

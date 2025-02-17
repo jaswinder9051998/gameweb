@@ -38,14 +38,18 @@
         </div>
     </div>
 
-    <!-- Game container (hidden initially) -->
+    <!-- Game container -->
     <div id="game-container" style="position: relative; display: none;">
         <canvas id="gameCanvas"></canvas>
     </div>
 
-    <!-- Socket.IO client -->
+    <!-- Load Socket.IO first -->
     <script src="/socket.io/socket.io.js"></script>
-    <!-- Game scripts -->
+    
+    <!-- Load config before other scripts -->
+    <script type="module" src="js/config.js"></script>
+    
+    <!-- Load game scripts -->
     <script type="module" src="js/lobby.js"></script>
     <script type="module" src="js/game.js"></script>
 </body>
