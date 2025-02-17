@@ -1,26 +1,20 @@
 const express = require('express');
-const app = express();
 const http = require('http');
+const { Server } = require("socket.io");
+const path = require('path');
+
+const app = express();
 const server = http.createServer(app);
-const { Server } = require('socket.io');
 
 // Configure Socket.IO with more permissive CORS and polling settings
 const io = new Server(server, {
     cors: {
         origin: "*",
-        methods: ["GET", "POST", "OPTIONS"],
-        allowedHeaders: ["*"],
-        credentials: false
+        methods: ["GET", "POST"]
     },
-    allowEIO3: true,
-    transports: ['polling', 'websocket'],
-    pingTimeout: 60000,
-    pingInterval: 25000,
-    upgradeTimeout: 10000,
-    allowUpgrades: true,
-    cookie: false,
-    connectTimeout: 45000,
-    maxHttpBufferSize: 1e8
+    transports: ['websocket', 'polling'], // Try websocket first, fallback to polling
+    pingTimeout: 60000, // Increase ping timeout for better stability
+    pingInterval: 25000 // Adjust ping interval
 });
 
 const PORT = process.env.PORT || 3000;
@@ -44,7 +38,7 @@ app.get('/health', (req, res) => {
 });
 
 // Serve static files from the "public" folder
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Basic route to serve index.html
 app.get('/', (req, res) => {
@@ -56,7 +50,7 @@ const rooms = {};
 
 // Handle WebSocket connections.
 io.on('connection', (socket) => {
-    console.log(`Socket connected: ${socket.id}`);
+    console.log('Client connected:', socket.id);
 
     // Create a new game room
     socket.on('createRoom', (data) => {
@@ -181,7 +175,7 @@ io.on('connection', (socket) => {
 
     // Handle disconnect
     socket.on('disconnect', () => {
-        console.log(`Socket disconnected: ${socket.id}`);
+        console.log('Client disconnected:', socket.id);
         // Clean up any rooms this socket was in
         for (const roomId in rooms) {
             const room = rooms[roomId];
@@ -207,13 +201,8 @@ function generateRoomId(length = 6) {
 }
 
 // Start server with error handling
-server.listen(process.env.PORT || 10000, '0.0.0.0', (err) => {
-    if (err) {
-        console.error('Server failed to start:', err);
-        return;
-    }
-    console.log(`Server is running on port ${process.env.PORT || 10000}`);
-    console.log('WebSocket server is ready');
+server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
 });
 
 // Handle server errors
