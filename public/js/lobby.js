@@ -24,7 +24,7 @@ try {
     socket.on('connect', () => {
         console.log('Connected to server');
         console.log('Socket ID:', socket.id);
-        console.log('Transport:', socket.io.engine.transport.name);  // Log the transport being used
+        console.log('Transport:', socket.io.engine.transport.name);
         enableButtons(true);
         lobbyMessage.textContent = 'Connected to server';
     });
@@ -57,6 +57,7 @@ function enableButtons(enabled) {
     joinRoomBtn.disabled = !enabled;
     collisionModeBtn.disabled = !enabled;
     territoryModeBtn.disabled = !enabled;
+    showRulesButton.disabled = !enabled;
 }
 
 // Get DOM elements for lobby UI
@@ -122,11 +123,29 @@ joinRoomBtn.addEventListener('click', () => {
     socket.emit('joinRoom', roomKey);
 });
 
+// Show rules when room is created or joined
+function showRulesIfNeeded() {
+    if (!localStorage.getItem('hasSeenRules')) {
+        rulesOverlay.style.display = 'flex';
+        // Store current room info
+        localStorage.setItem('pendingRoom', JSON.stringify({
+            roomId: currentRoomKey,
+            playerNumber: playerNumber
+        }));
+        // Prevent game start until rules are acknowledged
+        socket.disconnect();
+    } else {
+        // If rules already seen, proceed normally
+        socket.connect();
+    }
+}
+
 // Listen for room creation confirmation
 socket.on('roomCreated', (data) => {
     currentRoomKey = data.roomId;
     playerNumber = data.playerNumber;
     lobbyMessage.textContent = `Room created. You are Player ${playerNumber}. Share this room key with your friend: ${data.roomId}`;
+    showRulesIfNeeded();
 });
 
 // Listen for successful join
@@ -134,6 +153,7 @@ socket.on('roomJoined', (data) => {
     currentRoomKey = data.roomId;
     playerNumber = data.playerNumber;
     lobbyMessage.textContent = `Joined room ${data.roomId}. You are Player ${playerNumber}. Waiting for game to start...`;
+    showRulesIfNeeded();
 });
 
 // When both players have connected
@@ -151,4 +171,36 @@ socket.on('startGame', (data) => {
 // Handle error messages
 socket.on('errorMessage', (message) => {
     lobbyMessage.textContent = `Error: ${message}`;
-}); 
+});
+
+// Add at the top with other DOM elements
+const rulesOverlay = document.getElementById('rules-overlay');
+const rulesUnderstood = document.getElementById('rules-understood');
+
+// Update rules understood handler
+rulesUnderstood.addEventListener('click', () => {
+    rulesOverlay.style.display = 'none';
+    localStorage.setItem('hasSeenRules', 'true');
+    
+    // Reconnect and restore room state
+    const pendingRoom = JSON.parse(localStorage.getItem('pendingRoom'));
+    if (pendingRoom) {
+        socket.connect();
+        localStorage.removeItem('pendingRoom'); // Clean up
+    }
+});
+
+// Move show rules button to bottom of lobby controls
+const showRulesButton = document.createElement('button');
+showRulesButton.className = 'lobby-button';
+showRulesButton.textContent = 'Show Rules';
+showRulesButton.addEventListener('click', () => {
+    rulesOverlay.style.display = 'flex';
+});
+
+// Add the show rules button as the last element
+const lobbyControls = document.querySelector('.lobby-controls');
+lobbyControls.appendChild(showRulesButton);
+
+// Hide rules overlay initially
+rulesOverlay.style.display = 'none'; 

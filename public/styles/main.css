@@ -215,4 +215,93 @@ button:hover {
     .mode-button:active {
         transform: translateY(0) scale(0.98);
     }
+}
+
+/* Add these styles */
+.rules-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000; /* Above lobby overlay */
+}
+
+.rules-content {
+    background-color: white;
+    padding: 2rem;
+    border-radius: 10px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+    max-width: 500px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.rules-content h2 {
+    color: #333;
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.rules-section {
+    margin-bottom: 2rem;
+}
+
+.rules-section h3 {
+    color: #4CAF50;
+    margin-bottom: 1rem;
+}
+
+.rules-section ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+.rules-section li {
+    padding: 0.5rem 0;
+    padding-left: 1.5rem;
+    position: relative;
+}
+
+.rules-section li:before {
+    content: "•";
+    color: #4CAF50;
+    position: absolute;
+    left: 0;
+}
+
+.mode-explanation {
+    background-color: #f5f5f5;
+    padding: 1rem;
+    border-radius: 5px;
+    margin-bottom: 1rem;
+}
+
+.mode-explanation h4 {
+    color: #333;
+    margin: 0 0 0.5rem 0;
+}
+
+.mode-explanation p {
+    margin: 0;
+    color: #666;
+}
+
+#rules-understood {
+    display: block;
+    width: 100%;
+    margin-top: 1.5rem;
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+    .rules-content {
+        padding: 1.5rem;
+        font-size: 0.9rem;
+    }
 } 

@@ -204,6 +204,20 @@ class Game {
         if (this.gameState.activePlayer !== this.playerNumber) {
             return false; // Not this player's turn
         }
+
+        // Check if any opponent's pucks are still moving
+        const opponentPucks = this.gameState.pucks.filter(
+            puck => puck.player !== this.playerNumber
+        );
+        
+        const opponentPucksMoving = opponentPucks.some(puck => 
+            (Math.abs(puck.vx) > 0.01 || Math.abs(puck.vy) > 0.01)
+        );
+
+        if (opponentPucksMoving) {
+            return false; // Can't place while opponent's pucks are moving
+        }
+
         // First turn for either player - allow placement anywhere
         if (this.gameState.puckCounts.player1 === 0 || this.gameState.puckCounts.player2 === 0) {
             return this.isWithinBounds(x, y) && !this.isInRestrictedZone(x, y);
@@ -824,6 +838,64 @@ class Game {
             );
             this.ctx.restore();
         }
+
+        // Show territory placement message if in territory mode
+        if (this.gameState.gameMode === CONFIG.GAME_MODES.TERRITORY && 
+            !this.gameState.gameEnded && 
+            this.gameState.activePlayer === this.playerNumber &&
+            this.gameState.puckCounts.player1 > 0 && 
+            this.gameState.puckCounts.player2 > 0) {
+            
+            this.ctx.save();
+            this.ctx.font = '20px Arial';
+            this.ctx.textAlign = 'center';
+            
+            const playerColor = this.playerNumber === 1 ? 'red' : 'blue';
+            const coloredText = this.playerNumber === 1 ? '#ff4444' : '#4444ff';
+            
+            // Measure text widths
+            const prefix = 'You can only place pucks in the ';
+            const territory = `${playerColor} area`;
+            const prefixWidth = this.ctx.measureText(prefix).width;
+            const territoryWidth = this.ctx.measureText(territory).width;
+            
+            // Calculate total width and starting position
+            const totalWidth = prefixWidth + territoryWidth;
+            const startX = (CONFIG.CANVAS.WIDTH - totalWidth) / 2;
+            
+            // Draw prefix in black
+            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            this.ctx.textAlign = 'left';
+            this.ctx.fillText(prefix, startX, 30);
+            
+            // Draw colored part
+            this.ctx.fillStyle = coloredText;
+            this.ctx.fillText(territory, startX + prefixWidth, 30);
+            
+            this.ctx.restore();
+        }
+
+        // Show waiting message if opponent's pucks are moving
+        const opponentPucks = this.gameState.pucks.filter(
+            puck => puck.player !== this.playerNumber
+        );
+        
+        const opponentPucksMoving = opponentPucks.some(puck => 
+            (Math.abs(puck.vx) > 0.01 || Math.abs(puck.vy) > 0.01)
+        );
+
+        if (opponentPucksMoving && this.gameState.activePlayer === this.playerNumber) {
+            this.ctx.save();
+            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            this.ctx.font = '20px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText(
+                'Waiting for opponent\'s pucks to stop...',
+                CONFIG.CANVAS.WIDTH / 2,
+                CONFIG.CANVAS.HEIGHT - 30
+            );
+            this.ctx.restore();
+        }
     }
 
     drawBoard() {
@@ -1243,6 +1315,11 @@ class Game {
     calculateTerritory() {
         const grid = this.createTerritoryGrid();
         
+        // Only calculate territory if both players have placed at least one puck
+        if (this.gameState.puckCounts.player1 === 0 || this.gameState.puckCounts.player2 === 0) {
+            return grid; // Return empty grid (all zeros)
+        }
+        
         // Group pucks by player
         const player1Pucks = this.gameState.pucks.filter(p => p.player === 1);
         const player2Pucks = this.gameState.pucks.filter(p => p.player === 2);
@@ -1289,6 +1366,13 @@ class Game {
 
     updateTerritoryScores() {
         if (this.gameState.gameMode !== CONFIG.GAME_MODES.TERRITORY) return;
+        
+        // Only calculate scores if both players have placed at least one puck
+        if (this.gameState.puckCounts.player1 === 0 || this.gameState.puckCounts.player2 === 0) {
+            this.gameState.scores.player1 = this.gameState.collisionScores?.player1 || 0;
+            this.gameState.scores.player2 = this.gameState.collisionScores?.player2 || 0;
+            return;
+        }
 
         const grid = this.calculateTerritory();
         let player1Area = 0;

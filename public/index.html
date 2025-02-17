@@ -38,6 +38,38 @@
         </div>
     </div>
 
+    <!-- Update the rules overlay div -->
+    <div id="rules-overlay" class="rules-overlay" style="display: none;">
+        <div class="rules-content">
+            <h2>How to Play</h2>
+            
+            <div class="rules-section">
+                <h3>Basic Rules</h3>
+                <ul>
+                    <li>Take turns placing and launching pucks</li>
+                    <li>Click/tap once to place your puck</li>
+                    <li>Click/tap again anywhere to launch it</li>
+                    <li>Each player gets 5 pucks per game</li>
+                    <li>Wait for opponent's pucks to stop before your turn</li>
+                </ul>
+            </div>
+
+            <div class="rules-section">
+                <h3>Game Modes</h3>
+                <div class="mode-explanation">
+                    <h4>Collision Mode</h4>
+                    <p>Score points by hitting opponent's pucks with yours. Faster hits score more points!</p>
+                </div>
+                <div class="mode-explanation">
+                    <h4>Territory Mode</h4>
+                    <p>Control territory by placing pucks strategically. Score from both territory control and collisions.</p>
+                </div>
+            </div>
+
+            <button id="rules-understood" class="lobby-button">Got it!</button>
+        </div>
+    </div>
+
     <!-- Game container -->
     <div id="game-container" style="position: relative; display: none;">
         <canvas id="gameCanvas"></canvas>
