@@ -10,11 +10,16 @@ const io = new Server(server, {
         origin: "*",
         methods: ["GET", "POST"],
         allowedHeaders: ["*"],
-        credentials: true
+        credentials: false  // Match client setting
     },
-    transports: ['websocket', 'polling'],
+    transports: ['polling', 'websocket'],  // Match client order
     allowEIO3: true,
-    path: '/socket.io'  // Make sure path matches client
+    path: '/socket.io',
+    pingTimeout: 30000,
+    pingInterval: 25000,
+    upgradeTimeout: 10000,
+    allowUpgrades: true,
+    cookie: false
 });
 
 const PORT = process.env.PORT || 3000;

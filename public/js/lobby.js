@@ -6,19 +6,22 @@ import { CONFIG } from './config.js';
 let socket;
 try {
     socket = io(CONFIG.SERVER.URL, {
-        transports: ['websocket', 'polling'],
+        transports: ['polling', 'websocket'],  // Try polling first, then websocket
         upgrade: true,
         reconnection: true,
         reconnectionAttempts: 5,
         reconnectionDelay: 1000,
         timeout: 20000,
         forceNew: true,
-        path: '/socket.io'
+        path: '/socket.io',
+        withCredentials: false,  // Explicitly disable credentials
+        rejectUnauthorized: false  // Allow self-signed certificates
     });
 
     socket.on('connect', () => {
         console.log('Connected to server');
         console.log('Socket ID:', socket.id);
+        console.log('Transport:', socket.io.engine.transport.name);  // Log the transport being used
         enableButtons(true);
         lobbyMessage.textContent = 'Connected to server';
     });
