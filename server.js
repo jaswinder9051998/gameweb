@@ -11,20 +11,23 @@ const io = new Server(server, {
     cors: {
         origin: "*",
         methods: ["GET", "POST"],
-        credentials: true
+        credentials: true,
+        allowedHeaders: ["*"]
     },
     allowEIO3: true,
-    transports: ['websocket', 'polling'],
-    pingTimeout: 60000,
-    pingInterval: 25000,
-    upgradeTimeout: 30000,
+    transports: ['polling', 'websocket'],
+    pingTimeout: 30000,
+    pingInterval: 10000,
+    upgradeTimeout: 15000,
     maxHttpBufferSize: 1e8,
     path: '/socket.io/',
-    // Add connection policies
-    connectTimeout: 45000,
-    // Add better polling settings
+    connectTimeout: 30000,
     polling: {
-        requestTimeout: 60000
+        requestTimeout: 30000
+    },
+    allowUpgrades: true,
+    perMessageDeflate: {
+        threshold: 2048
     }
 });
 
@@ -237,4 +240,16 @@ process.on('uncaughtException', (err) => {
 
 process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+// Add this after io initialization
+io.engine.on('initial_headers', (headers, req) => {
+    headers['Access-Control-Allow-Origin'] = '*';
+    headers['Access-Control-Allow-Credentials'] = 'true';
+});
+
+// Add this after the previous line
+io.engine.on('headers', (headers, req) => {
+    headers['Access-Control-Allow-Origin'] = '*';
+    headers['Access-Control-Allow-Credentials'] = 'true';
 }); 
