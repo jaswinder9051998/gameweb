@@ -11,8 +11,9 @@ const socket = io(window.location.origin, {
     upgrade: true,
     rememberUpgrade: true,
     path: '/socket.io/',
-    withCredentials: true,
-    forceNew: true
+    withCredentials: false,
+    forceNew: true,
+    rejectUnauthorized: false
 });
 
 let reconnectAttempts = 0;

@@ -9,9 +9,9 @@ const server = http.createServer(app);
 // Configure Socket.IO with more permissive CORS and polling settings
 const io = new Server(server, {
     cors: {
-        origin: "*",
-        methods: ["GET", "POST"],
-        credentials: true,
+        origin: ["https://gameweb-16d7.onrender.com", "https://gameweb-gqxr.onrender.com"],
+        methods: ["GET", "POST", "OPTIONS"],
+        credentials: false,
         allowedHeaders: ["*"]
     },
     allowEIO3: true,
@@ -28,7 +28,8 @@ const io = new Server(server, {
     allowUpgrades: true,
     perMessageDeflate: {
         threshold: 2048
-    }
+    },
+    cookie: false
 });
 
 const PORT = process.env.PORT || 3000;
@@ -37,10 +38,9 @@ const PORT = process.env.PORT || 3000;
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Headers', '*');
+    res.header('Access-Control-Allow-Credentials', 'false');
     
-    // Handle preflight
     if (req.method === 'OPTIONS') {
         return res.status(200).end();
     }
@@ -240,16 +240,4 @@ process.on('uncaughtException', (err) => {
 
 process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-});
-
-// Add this after io initialization
-io.engine.on('initial_headers', (headers, req) => {
-    headers['Access-Control-Allow-Origin'] = '*';
-    headers['Access-Control-Allow-Credentials'] = 'true';
-});
-
-// Add this after the previous line
-io.engine.on('headers', (headers, req) => {
-    headers['Access-Control-Allow-Origin'] = '*';
-    headers['Access-Control-Allow-Credentials'] = 'true';
 }); 

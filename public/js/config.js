@@ -56,4 +56,16 @@ export const CONFIG = {
             ? 'http://localhost:3000' 
             : 'https://gameweb-qqxr.onrender.com'  // Remove the port number
     }
+};
+
+window.SOCKET_CONFIG = {
+    path: '/socket.io/',
+    transports: ['polling', 'websocket'],
+    autoConnect: true,
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    timeout: 20000,
+    withCredentials: false
 }; 
