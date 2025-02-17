@@ -20,6 +20,12 @@ class Game {
 
         // Add this line
         document.body.classList.add('game-active');
+
+        // Add scaling factors
+        this.updateScalingFactors();
+        
+        // Add window resize handler
+        window.addEventListener('resize', () => this.updateScalingFactors());
     }
 
     init(gameMode) {
@@ -72,11 +78,17 @@ class Game {
         this.canvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
     }
 
+    updateScalingFactors() {
+        const rect = this.canvas.getBoundingClientRect();
+        this.scaleX = this.canvas.width / rect.width;
+        this.scaleY = this.canvas.height / rect.height;
+    }
+
     handleMouseMove(e) {
         if (!this.gameState.isCharging) {
             const rect = this.canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            const x = (e.clientX - rect.left) * this.scaleX;
+            const y = (e.clientY - rect.top) * this.scaleY;
             this.previewPuckPosition = { x, y };
         }
     }
@@ -85,8 +97,8 @@ class Game {
         if (this.gameState.gameEnded || this.gameState.currentPuck) return;
 
         const rect = this.canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        const x = (e.clientX - rect.left) * this.scaleX;
+        const y = (e.clientY - rect.top) * this.scaleY;
 
         // Check if player has pucks remaining
         if (this.gameState.puckCounts[`player${this.gameState.activePlayer}`] >= CONFIG.PUCK.MAX_PUCKS_PER_PLAYER) {
@@ -164,7 +176,7 @@ class Game {
     launchPuck() {
         if (!this.gameState.currentPuck) return;
 
-        // Calculate the vector from center to puck (the rope)
+        // Calculate launch vector using normalized coordinates
         const ropeVector = {
             x: this.gameState.currentPuck.x - this.gameState.rotationCenter.x,
             y: this.gameState.currentPuck.y - this.gameState.rotationCenter.y
@@ -183,8 +195,9 @@ class Game {
         launchDirection.y /= length;
 
         // Calculate power based on charge time
+        const currentTime = Date.now();
         const power = Math.min(
-            (Date.now() - this.gameState.chargeStartTime) / CONFIG.PUCK.MAX_CHARGE_TIME,
+            (currentTime - this.gameState.chargeStartTime) / CONFIG.PUCK.MAX_CHARGE_TIME,
             1
         );
         
@@ -198,7 +211,7 @@ class Game {
             y: launchDirection.y * launchSpeed
         };
 
-        // Create the final puck object with velocity
+        // Ensure coordinates are normalized before sending
         const launchedPuck = {
             x: this.gameState.currentPuck.x,
             y: this.gameState.currentPuck.y,
@@ -207,7 +220,7 @@ class Game {
             player: this.gameState.activePlayer
         };
 
-        // Send the puck launch data to the server
+        // Send normalized coordinates to server
         this.socket.emit('gameMove', {
             roomId: this.roomId,
             type: 'launch',
@@ -1249,11 +1262,17 @@ class Game {
 
     handleGameUpdate(data) {
         if (data.type === 'launch') {
-            // Add the new puck to our game state
-            this.gameState.pucks.push(data.puck);
+            // Ensure coordinates are in canvas space
+            const puck = {
+                ...data.puck,
+                x: data.puck.x,
+                y: data.puck.y,
+                vx: data.puck.vx,
+                vy: data.puck.vy
+            };
+
+            this.gameState.pucks.push(puck);
             this.gameState.puckCounts[`player${data.puck.player}`]++;
-            
-            // Update active player
             this.gameState.activePlayer = data.currentTurn === 'player1' ? 1 : 2;
         } 
         else if (data.type === 'collision') {
@@ -1304,15 +1323,15 @@ class Game {
         this.canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
             if (this.gameState.gameEnded || this.gameState.currentPuck) return;
-            
+            if (this.gameState.activePlayer !== this.playerNumber) return;
+
             isTouching = true;
             touchStartTime = Date.now();
             const touch = e.touches[0];
             const rect = this.canvas.getBoundingClientRect();
-            touchX = (touch.clientX - rect.left) * (this.canvas.width / rect.width);
-            touchY = (touch.clientY - rect.top) * (this.canvas.height / rect.height);
+            touchX = (touch.clientX - rect.left) * this.scaleX;
+            touchY = (touch.clientY - rect.top) * this.scaleY;
 
-            // Use existing mouse down logic
             if (this.isValidPlacement(touchX, touchY)) {
                 this.gameState.rotationCenter = { x: touchX, y: touchY };
                 this.gameState.isCharging = true;
@@ -1333,11 +1352,14 @@ class Game {
             if (isTouching && this.gameState.isCharging) {
                 const touch = e.touches[0];
                 const rect = this.canvas.getBoundingClientRect();
-                touchX = (touch.clientX - rect.left) * (this.canvas.width / rect.width);
-                touchY = (touch.clientY - rect.top) * (this.canvas.height / rect.height);
+                touchX = (touch.clientX - rect.left) * this.scaleX;
+                touchY = (touch.clientY - rect.top) * this.scaleY;
                 
                 // Update the preview position
-                this.previewPuckPosition = { x: touchX, y: touchY };
+                if (this.gameState.currentPuck) {
+                    this.gameState.currentPuck.x = touchX + Math.cos(this.gameState.rotationAngle) * this.gameState.rotationRadius;
+                    this.gameState.currentPuck.y = touchY + Math.sin(this.gameState.rotationAngle) * this.gameState.rotationRadius;
+                }
             }
         }, { passive: false });
 
@@ -1360,6 +1382,14 @@ class Game {
             }
             isTouching = false;
         }, { passive: false });
+    }
+
+    // Add this method to ensure consistent coordinate handling
+    normalizeCoordinates(x, y) {
+        return {
+            x: x * this.scaleX,
+            y: y * this.scaleY
+        };
     }
 }
 
