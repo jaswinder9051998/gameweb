@@ -15,8 +15,11 @@ class Game {
             this.handleGameUpdate(data);
         });
 
-        // Add these touch event handlers to your game initialization
-        initializeTouchControls(this.canvas, this);
+        // Add touch controls initialization
+        this.initializeTouchControls();
+
+        // Add this line
+        document.body.classList.add('game-active');
     }
 
     init(gameMode) {
@@ -1291,63 +1294,76 @@ class Game {
             this.playAgainButton.style.display = 'none';
         }
     }
+
+    // Add this method to the Game class
+    initializeTouchControls() {
+        let touchStartTime = 0;
+        let isTouching = false;
+        let touchX, touchY;
+
+        this.canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (this.gameState.gameEnded || this.gameState.currentPuck) return;
+            
+            isTouching = true;
+            touchStartTime = Date.now();
+            const touch = e.touches[0];
+            const rect = this.canvas.getBoundingClientRect();
+            touchX = (touch.clientX - rect.left) * (this.canvas.width / rect.width);
+            touchY = (touch.clientY - rect.top) * (this.canvas.height / rect.height);
+
+            // Use existing mouse down logic
+            if (this.isValidPlacement(touchX, touchY)) {
+                this.gameState.rotationCenter = { x: touchX, y: touchY };
+                this.gameState.isCharging = true;
+                this.gameState.chargeStartTime = Date.now();
+                this.gameState.rotationAngle = 0;
+                
+                this.gameState.currentPuck = {
+                    x: touchX + Math.cos(this.gameState.rotationAngle) * this.gameState.rotationRadius,
+                    y: touchY + Math.sin(this.gameState.rotationAngle) * this.gameState.rotationRadius,
+                    player: this.gameState.activePlayer,
+                    isCharging: true
+                };
+            }
+        }, { passive: false });
+
+        this.canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (isTouching && this.gameState.isCharging) {
+                const touch = e.touches[0];
+                const rect = this.canvas.getBoundingClientRect();
+                touchX = (touch.clientX - rect.left) * (this.canvas.width / rect.width);
+                touchY = (touch.clientY - rect.top) * (this.canvas.height / rect.height);
+                
+                // Update the preview position
+                this.previewPuckPosition = { x: touchX, y: touchY };
+            }
+        }, { passive: false });
+
+        this.canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (isTouching && this.gameState.isCharging) {
+                // Use existing launch logic
+                this.launchPuck();
+            }
+            isTouching = false;
+        }, { passive: false });
+
+        this.canvas.addEventListener('touchcancel', (e) => {
+            e.preventDefault();
+            if (this.gameState.isCharging) {
+                this.gameState.isCharging = false;
+                this.gameState.currentPuck = null;
+                this.gameState.chargeStartTime = null;
+                this.gameState.rotationCenter = null;
+            }
+            isTouching = false;
+        }, { passive: false });
+    }
 }
 
 // Modify the startGame function to accept player info
 window.startGame = function(playerNumber, socket, roomId, gameMode) {
     new Game(playerNumber, socket, roomId, gameMode);
-};
-
-// Add these touch event handlers to your game initialization
-function initializeTouchControls(canvas, game) {
-    let touchStartTime = 0;
-    let isTouching = false;
-    let touchX, touchY;
-
-    canvas.addEventListener('touchstart', (e) => {
-        e.preventDefault(); // Prevent scrolling
-        isTouching = true;
-        touchStartTime = Date.now();
-        const touch = e.touches[0];
-        const rect = canvas.getBoundingClientRect();
-        touchX = touch.clientX - rect.left;
-        touchY = touch.clientY - rect.top;
-        
-        // Start charging animation
-        game.startCharging(touchX, touchY);
-    }, { passive: false });
-
-    canvas.addEventListener('touchmove', (e) => {
-        e.preventDefault();
-        if (isTouching) {
-            const touch = e.touches[0];
-            const rect = canvas.getBoundingClientRect();
-            touchX = touch.clientX - rect.left;
-            touchY = touch.clientY - rect.top;
-            
-            // Update aim direction
-            game.updateAim(touchX, touchY);
-        }
-    }, { passive: false });
-
-    canvas.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        if (isTouching) {
-            const chargeTime = Date.now() - touchStartTime;
-            isTouching = false;
-            
-            // Launch puck
-            game.launch(chargeTime);
-        }
-    }, { passive: false });
-
-    // Add touch cancel handler
-    canvas.addEventListener('touchcancel', (e) => {
-        e.preventDefault();
-        isTouching = false;
-        game.cancelCharge();
-    }, { passive: false });
-}
-
-// Call this function after creating your canvas
-initializeTouchControls(canvas, game); 
+}; 

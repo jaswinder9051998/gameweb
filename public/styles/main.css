@@ -159,12 +159,25 @@ button:hover {
         width: 95vw;
         height: auto;
         margin: 0 auto;
+        touch-action: none; /* Prevent browser touch actions */
     }
 
     #gameCanvas {
+        width: 100% !important; /* Force width */
+        height: auto !important; /* Maintain aspect ratio */
+        touch-action: none;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Prevent scrolling when touching the canvas */
+    body.game-active {
+        overflow: hidden;
+        position: fixed;
         width: 100%;
-        height: auto;
-        touch-action: none; /* Prevents default touch actions */
+        height: 100%;
     }
 
     .lobby-content {
