@@ -25,13 +25,19 @@ class Game {
         this.updateScalingFactors();
         
         // Add window resize handler
-        window.addEventListener('resize', () => this.updateScalingFactors());
+        window.addEventListener('resize', () => this.updateCanvasDisplay());
     }
 
     init(gameMode) {
-        // Set canvas size from config
+        // Always use fixed dimensions for the canvas
         this.canvas.width = CONFIG.CANVAS.WIDTH;
         this.canvas.height = CONFIG.CANVAS.HEIGHT;
+        
+        // Calculate and set the CSS size for display
+        this.updateCanvasDisplay();
+        
+        // Initialize scaling
+        this.updateScalingFactors();
         
         // Initialize game state
         this.gameState = {
@@ -72,51 +78,82 @@ class Game {
         this.gameLoop();
     }
 
+    updateCanvasDisplay() {
+        const containerWidth = this.canvas.parentElement.clientWidth;
+        const containerHeight = this.canvas.parentElement.clientHeight;
+        
+        // Calculate scale to fit container while maintaining aspect ratio
+        const scaleX = containerWidth / CONFIG.CANVAS.WIDTH;
+        const scaleY = containerHeight / CONFIG.CANVAS.HEIGHT;
+        const scale = Math.min(scaleX, scaleY, 1); // Never scale up beyond 1
+
+        // Set CSS dimensions
+        const displayWidth = CONFIG.CANVAS.WIDTH * scale;
+        const displayHeight = CONFIG.CANVAS.HEIGHT * scale;
+        
+        this.canvas.style.width = `${displayWidth}px`;
+        this.canvas.style.height = `${displayHeight}px`;
+        
+        // Store scale for input calculations
+        this.displayScale = scale;
+    }
+
     setupEventListeners() {
         this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
         this.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
         this.canvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+        window.addEventListener('resize', () => {
+            this.updateCanvasDisplay();
+        });
     }
 
     updateScalingFactors() {
         const rect = this.canvas.getBoundingClientRect();
-        this.scaleX = this.canvas.width / rect.width;
-        this.scaleY = this.canvas.height / rect.height;
+        
+        // Calculate scale factors based on BASE dimensions
+        this.scaleX = CONFIG.CANVAS.BASE_WIDTH / rect.width;
+        this.scaleY = CONFIG.CANVAS.BASE_HEIGHT / rect.height;
+        
+        // Store display scale for rendering
+        this.displayScale = rect.width / CONFIG.CANVAS.BASE_WIDTH;
+        
+        // Update canvas context transform
+        this.ctx.setTransform(
+            this.displayScale, 0,
+            0, this.displayScale,
+            0, 0
+        );
     }
 
     handleMouseMove(e) {
         if (!this.gameState.isCharging) {
-            const rect = this.canvas.getBoundingClientRect();
-            const x = (e.clientX - rect.left) * this.scaleX;
-            const y = (e.clientY - rect.top) * this.scaleY;
-            this.previewPuckPosition = { x, y };
+            const coords = this.normalizeCoordinates(e.clientX, e.clientY);
+            this.previewPuckPosition = coords;
         }
     }
 
     handleMouseDown(e) {
         if (this.gameState.gameEnded || this.gameState.currentPuck) return;
 
-        const rect = this.canvas.getBoundingClientRect();
-        const x = (e.clientX - rect.left) * this.scaleX;
-        const y = (e.clientY - rect.top) * this.scaleY;
-
+        const coords = this.normalizeCoordinates(e.clientX, e.clientY);
+        
         // Check if player has pucks remaining
         if (this.gameState.puckCounts[`player${this.gameState.activePlayer}`] >= CONFIG.PUCK.MAX_PUCKS_PER_PLAYER) {
             return;
         }
 
-        if (this.isValidPlacement(x, y)) {
-            this.gameState.rotationCenter = { x, y };
+        if (this.isValidPlacement(coords.x, coords.y)) {
+            this.gameState.rotationCenter = coords;
             this.gameState.isCharging = true;
             this.gameState.chargeStartTime = Date.now();
             this.gameState.rotationAngle = 0;
             
             // Create a temporary puck for charging animation
             this.gameState.currentPuck = {
-                x: x + Math.cos(this.gameState.rotationAngle) * this.gameState.rotationRadius,
-                y: y + Math.sin(this.gameState.rotationAngle) * this.gameState.rotationRadius,
+                x: coords.x + Math.cos(this.gameState.rotationAngle) * this.gameState.rotationRadius,
+                y: coords.y + Math.sin(this.gameState.rotationAngle) * this.gameState.rotationRadius,
                 player: this.gameState.activePlayer,
-                isCharging: true  // Add this flag to identify charging pucks
+                isCharging: true
             };
         }
     }
@@ -1318,7 +1355,6 @@ class Game {
     initializeTouchControls() {
         let touchStartTime = 0;
         let isTouching = false;
-        let touchX, touchY;
 
         this.canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
@@ -1328,19 +1364,17 @@ class Game {
             isTouching = true;
             touchStartTime = Date.now();
             const touch = e.touches[0];
-            const rect = this.canvas.getBoundingClientRect();
-            touchX = (touch.clientX - rect.left) * this.scaleX;
-            touchY = (touch.clientY - rect.top) * this.scaleY;
+            const coords = this.normalizeCoordinates(touch.clientX, touch.clientY);
 
-            if (this.isValidPlacement(touchX, touchY)) {
-                this.gameState.rotationCenter = { x: touchX, y: touchY };
+            if (this.isValidPlacement(coords.x, coords.y)) {
+                this.gameState.rotationCenter = coords;
                 this.gameState.isCharging = true;
                 this.gameState.chargeStartTime = Date.now();
                 this.gameState.rotationAngle = 0;
                 
                 this.gameState.currentPuck = {
-                    x: touchX + Math.cos(this.gameState.rotationAngle) * this.gameState.rotationRadius,
-                    y: touchY + Math.sin(this.gameState.rotationAngle) * this.gameState.rotationRadius,
+                    x: coords.x + Math.cos(this.gameState.rotationAngle) * this.gameState.rotationRadius,
+                    y: coords.y + Math.sin(this.gameState.rotationAngle) * this.gameState.rotationRadius,
                     player: this.gameState.activePlayer,
                     isCharging: true
                 };
@@ -1351,14 +1385,12 @@ class Game {
             e.preventDefault();
             if (isTouching && this.gameState.isCharging) {
                 const touch = e.touches[0];
-                const rect = this.canvas.getBoundingClientRect();
-                touchX = (touch.clientX - rect.left) * this.scaleX;
-                touchY = (touch.clientY - rect.top) * this.scaleY;
+                const coords = this.normalizeCoordinates(touch.clientX, touch.clientY);
                 
                 // Update the preview position
                 if (this.gameState.currentPuck) {
-                    this.gameState.currentPuck.x = touchX + Math.cos(this.gameState.rotationAngle) * this.gameState.rotationRadius;
-                    this.gameState.currentPuck.y = touchY + Math.sin(this.gameState.rotationAngle) * this.gameState.rotationRadius;
+                    this.gameState.currentPuck.x = coords.x + Math.cos(this.gameState.rotationAngle) * this.gameState.rotationRadius;
+                    this.gameState.currentPuck.y = coords.y + Math.sin(this.gameState.rotationAngle) * this.gameState.rotationRadius;
                 }
             }
         }, { passive: false });
@@ -1385,10 +1417,11 @@ class Game {
     }
 
     // Add this method to ensure consistent coordinate handling
-    normalizeCoordinates(x, y) {
+    normalizeCoordinates(clientX, clientY) {
+        const rect = this.canvas.getBoundingClientRect();
         return {
-            x: x * this.scaleX,
-            y: y * this.scaleY
+            x: (clientX - rect.left) * (CONFIG.CANVAS.WIDTH / rect.width),
+            y: (clientY - rect.top) * (CONFIG.CANVAS.HEIGHT / rect.height)
         };
     }
 }

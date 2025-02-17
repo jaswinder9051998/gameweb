@@ -1,29 +1,15 @@
 export const CONFIG = {
     CANVAS: {
-        get WIDTH() {
-            if (window.innerWidth <= 768) {
-                return Math.min(window.innerWidth * 0.95, 600);
-            }
-            return 800;
-        },
-        get HEIGHT() {
-            if (window.innerWidth <= 768) {
-                return Math.min(window.innerHeight * 0.7, 400);
-            }
-            return 600;
-        }
+        WIDTH: 800,
+        HEIGHT: 600,
     },
     PUCK: {
-        get RADIUS() {
-            return window.innerWidth <= 768 ? 15 : 20;
-        },
-        get RESTRICTED_ZONE_RADIUS() {
-            return window.innerWidth <= 768 ? 30 : 40;
-        },
-        MAX_CHARGE_TIME: 3000,   // in milliseconds (3 seconds)
+        RADIUS: 20,
+        RESTRICTED_ZONE_RADIUS: 40,
+        MAX_CHARGE_TIME: 3000,
         MAX_LAUNCH_SPEED: 20,
         MIN_LAUNCH_SPEED: 5,
-        MAX_PUCKS_PER_PLAYER: 5  // New: Maximum pucks per player
+        MAX_PUCKS_PER_PLAYER: 5
     },
     PHYSICS: {
         FRICTION: 0.98,         // Increased friction (was 0.98)
