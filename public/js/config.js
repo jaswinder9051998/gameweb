@@ -1,11 +1,25 @@
 export const CONFIG = {
     CANVAS: {
-        WIDTH: 800,
-        HEIGHT: 600
+        get WIDTH() {
+            if (window.innerWidth <= 768) {
+                return Math.min(window.innerWidth * 0.95, 600);
+            }
+            return 800;
+        },
+        get HEIGHT() {
+            if (window.innerWidth <= 768) {
+                return Math.min(window.innerHeight * 0.7, 400);
+            }
+            return 600;
+        }
     },
     PUCK: {
-        RADIUS: 20,
-        RESTRICTED_ZONE_RADIUS: 40,
+        get RADIUS() {
+            return window.innerWidth <= 768 ? 15 : 20;
+        },
+        get RESTRICTED_ZONE_RADIUS() {
+            return window.innerWidth <= 768 ? 30 : 40;
+        },
         MAX_CHARGE_TIME: 3000,   // in milliseconds (3 seconds)
         MAX_LAUNCH_SPEED: 20,
         MIN_LAUNCH_SPEED: 5,

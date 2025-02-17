@@ -14,6 +14,9 @@ class Game {
         this.socket.on('gameUpdated', (data) => {
             this.handleGameUpdate(data);
         });
+
+        // Add these touch event handlers to your game initialization
+        initializeTouchControls(this.canvas, this);
     }
 
     init(gameMode) {
@@ -1293,4 +1296,58 @@ class Game {
 // Modify the startGame function to accept player info
 window.startGame = function(playerNumber, socket, roomId, gameMode) {
     new Game(playerNumber, socket, roomId, gameMode);
-}; 
+};
+
+// Add these touch event handlers to your game initialization
+function initializeTouchControls(canvas, game) {
+    let touchStartTime = 0;
+    let isTouching = false;
+    let touchX, touchY;
+
+    canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault(); // Prevent scrolling
+        isTouching = true;
+        touchStartTime = Date.now();
+        const touch = e.touches[0];
+        const rect = canvas.getBoundingClientRect();
+        touchX = touch.clientX - rect.left;
+        touchY = touch.clientY - rect.top;
+        
+        // Start charging animation
+        game.startCharging(touchX, touchY);
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        if (isTouching) {
+            const touch = e.touches[0];
+            const rect = canvas.getBoundingClientRect();
+            touchX = touch.clientX - rect.left;
+            touchY = touch.clientY - rect.top;
+            
+            // Update aim direction
+            game.updateAim(touchX, touchY);
+        }
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        if (isTouching) {
+            const chargeTime = Date.now() - touchStartTime;
+            isTouching = false;
+            
+            // Launch puck
+            game.launch(chargeTime);
+        }
+    }, { passive: false });
+
+    // Add touch cancel handler
+    canvas.addEventListener('touchcancel', (e) => {
+        e.preventDefault();
+        isTouching = false;
+        game.cancelCharge();
+    }, { passive: false });
+}
+
+// Call this function after creating your canvas
+initializeTouchControls(canvas, game); 

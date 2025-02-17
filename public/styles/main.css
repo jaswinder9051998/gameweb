@@ -151,4 +151,45 @@ button:hover {
     font-size: 0.8rem;
     margin-top: 0.5rem;
     opacity: 0.8;
+}
+
+/* Add these responsive styles */
+@media (max-width: 768px) {
+    #game-container {
+        width: 95vw;
+        height: auto;
+        margin: 0 auto;
+    }
+
+    #gameCanvas {
+        width: 100%;
+        height: auto;
+        touch-action: none; /* Prevents default touch actions */
+    }
+
+    .lobby-content {
+        width: 90%;
+        padding: 1rem;
+    }
+
+    .mode-buttons {
+        flex-direction: column;
+    }
+
+    .mode-button {
+        width: 100%;
+        margin-bottom: 1rem;
+    }
+}
+
+/* Add touch feedback styles */
+@media (hover: none) {
+    .lobby-button:active {
+        background-color: #45a049;
+        transform: scale(0.98);
+    }
+
+    .mode-button:active {
+        transform: translateY(0) scale(0.98);
+    }
 } 
