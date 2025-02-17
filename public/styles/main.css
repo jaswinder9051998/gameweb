@@ -159,17 +159,13 @@ button:hover {
         width: 95vw;
         height: auto;
         margin: 0 auto;
-        touch-action: none; /* Prevent browser touch actions */
+        aspect-ratio: 4/3; /* Maintain aspect ratio */
     }
 
     #gameCanvas {
-        width: 100% !important; /* Force width */
-        height: auto !important; /* Maintain aspect ratio */
+        width: 100%;
+        height: 100%;
         touch-action: none;
-        -webkit-touch-callout: none;
-        -webkit-user-select: none;
-        user-select: none;
-        -webkit-tap-highlight-color: transparent;
     }
 
     /* Prevent scrolling when touching the canvas */
