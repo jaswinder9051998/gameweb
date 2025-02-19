@@ -12,8 +12,8 @@ export const CONFIG = {
         MAX_PUCKS_PER_PLAYER: 5
     },
     PHYSICS: {
-        FRICTION: 0.98,         // Increased friction (was 0.98)
-        COLLISION_ELASTICITY: 0.5,  // Reduced from 0.7 to 0.5 for stronger dampening
+        FRICTION: 0.95,         // Increased friction for faster slowdown
+        COLLISION_ELASTICITY: 0.2,  // Further reduced elasticity for stronger dampening
     },
     UI: {
         POWER_BAR: {
@@ -68,4 +68,4 @@ window.SOCKET_CONFIG = {
     reconnectionDelayMax: 5000,
     timeout: 20000,
     withCredentials: false
-}; 
+};

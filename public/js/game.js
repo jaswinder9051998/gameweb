@@ -443,8 +443,16 @@ class Game {
                 puck.x += puck.vx;
                 puck.y += puck.vy;
 
-                // Wall collisions with speed reduction
-                const wallDamping = 0.7; // Reduce speed by 30% on wall hits
+                // Wall collisions with speed-based dampening
+                const speed = Math.sqrt(puck.vx * puck.vx + puck.vy * puck.vy);
+                let wallDamping;
+                if (speed < 1) {
+                    wallDamping = 0.3; // Very strong dampening for very slow speeds
+                } else if (speed < 2) {
+                    wallDamping = 0.5; // Strong dampening for slow speeds
+                } else {
+                    wallDamping = 0.7; // Normal dampening for higher speeds
+                }
                 
                 // Left and right walls
                 if (puck.x - CONFIG.PUCK.RADIUS < 0) {
@@ -646,56 +654,75 @@ class Game {
                     });
                 }
 
-                // Calculate relative velocity
-                const vx = (puck.vx || 0) - (otherPuck.vx || 0);
-                const vy = (puck.vy || 0) - (otherPuck.vy || 0);
-                const speed = Math.sqrt(vx * vx + vy * vy);
-
-                // Calculate collision force for scoring
-                if (speed > 1) {
-                    this.handleCollisionScore(puck, otherPuck, speed);
-                }
-
-                // Normalize collision normal
+                // First separate the pucks to prevent sticking
                 const nx = dx / distance;
                 const ny = dy / distance;
-
-                // Calculate relative velocity in terms of normal direction
-                const velocityAlongNormal = vx * nx + vy * ny;
-
-                // Don't resolve collision if pucks are moving apart
-                if (velocityAlongNormal > 0) return;
-
-                // Calculate impulse scalar with reduced transfer
-                const restitution = CONFIG.PHYSICS.COLLISION_ELASTICITY;
-                const impulseMagnitude = -(1 + restitution) * velocityAlongNormal * 0.5; // Added 0.5 factor
-
-                // Apply impulse with momentum conservation
-                const totalMass = 2; // Both pucks have mass of 1
-                const puck1Ratio = 1 / totalMass;
-                const puck2Ratio = 1 / totalMass;
-
-                // Apply impulse with mass ratios
-                puck.vx = (puck.vx || 0) - (impulseMagnitude * nx * puck1Ratio);
-                puck.vy = (puck.vy || 0) - (impulseMagnitude * ny * puck1Ratio);
-                otherPuck.vx = (otherPuck.vx || 0) + (impulseMagnitude * nx * puck2Ratio);
-                otherPuck.vy = (otherPuck.vy || 0) + (impulseMagnitude * ny * puck2Ratio);
-
-                // Additional velocity dampening for the receiving puck
-                if (!otherPuck.vx && !otherPuck.vy) { // If it was stationary
-                    otherPuck.vx *= 0.4; // Reduce transferred velocity by 60%
-                    otherPuck.vy *= 0.4;
-                }
-
-                // Separate the pucks to prevent sticking
                 const overlap = (CONFIG.PUCK.RADIUS * 2) - distance;
                 const separationX = (overlap * nx) / 2;
                 const separationY = (overlap * ny) / 2;
-                
                 puck.x -= separationX;
                 puck.y -= separationY;
                 otherPuck.x += separationX;
                 otherPuck.y += separationY;
+
+                // Calculate velocities and speeds
+                const relativeVx = (puck.vx || 0) - (otherPuck.vx || 0);
+                const relativeVy = (puck.vy || 0) - (otherPuck.vy || 0);
+                const relativeSpeed = Math.sqrt(relativeVx * relativeVx + relativeVy * relativeVy);
+
+                // Only process collision if relative speed is significant
+                if (relativeSpeed > 0.1) {
+                    // Calculate collision force for scoring
+                    if (relativeSpeed > 1) {
+                        this.handleCollisionScore(puck, otherPuck, relativeSpeed);
+                    }
+
+                    // Calculate relative velocity in terms of normal direction
+                    const velocityAlongNormal = relativeVx * nx + relativeVy * ny;
+
+                    // Don't resolve collision if pucks are moving apart
+                    if (velocityAlongNormal > 0) return;
+
+                    // Calculate impulse scalar with speed-based elasticity
+                    const baseRestitution = CONFIG.PHYSICS.COLLISION_ELASTICITY;
+                    
+                    // Use a more aggressive dampening for low-speed collisions
+                    let restitution;
+                    let dampening;
+                    if (relativeSpeed < 1) {
+                        restitution = baseRestitution * 0.05; // Almost no elasticity for very slow collisions
+                        dampening = 0.1; // Very strong dampening
+                    } else if (relativeSpeed < 2) {
+                        restitution = baseRestitution * 0.2; // Very low elasticity for slow collisions
+                        dampening = 0.3; // Strong dampening
+                    } else if (relativeSpeed < 3) {
+                        restitution = baseRestitution * 0.4; // Low elasticity for moderate collisions
+                        dampening = 0.5; // Moderate dampening
+                    } else {
+                        restitution = baseRestitution * Math.min(relativeSpeed / 5, 1);
+                        dampening = Math.max(0.7, Math.min(relativeSpeed / 5, 1)); // Less dampening for faster collisions
+                    }
+
+                    const impulseMagnitude = -(1 + restitution) * velocityAlongNormal * 0.5;
+
+                    // Apply impulse with momentum conservation
+                    const totalMass = 2;
+                    const puck1Ratio = 1 / totalMass;
+                    const puck2Ratio = 1 / totalMass;
+
+                    // Calculate new velocities with dampening
+                    let newPuckVx = ((puck.vx || 0) - (impulseMagnitude * nx * puck1Ratio)) * dampening;
+                    let newPuckVy = ((puck.vy || 0) - (impulseMagnitude * ny * puck1Ratio)) * dampening;
+                    let newOtherVx = ((otherPuck.vx || 0) + (impulseMagnitude * nx * puck2Ratio)) * dampening;
+                    let newOtherVy = ((otherPuck.vy || 0) + (impulseMagnitude * ny * puck2Ratio)) * dampening;
+
+                    // Apply minimum velocity threshold
+                    const minVelocity = 0.1;
+                    puck.vx = Math.abs(newPuckVx) < minVelocity ? 0 : newPuckVx;
+                    puck.vy = Math.abs(newPuckVy) < minVelocity ? 0 : newPuckVy;
+                    otherPuck.vx = Math.abs(newOtherVx) < minVelocity ? 0 : newOtherVx;
+                    otherPuck.vy = Math.abs(newOtherVy) < minVelocity ? 0 : newOtherVy;
+                }
             }
         }
     }
@@ -1060,59 +1087,86 @@ class Game {
     }
 
     drawScoreboard() {
-        this.ctx.save();
-        
-        // Draw puck count box
-        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-        this.ctx.fillRect(10, 10, 200, 40);
-        this.ctx.strokeStyle = '#333';
-        this.ctx.strokeRect(10, 10, 200, 40);
+        // Create or update scoreboard container
+        let scoreboardContainer = document.getElementById('scoreboardContainer');
+        if (!scoreboardContainer) {
+            scoreboardContainer = document.createElement('div');
+            scoreboardContainer.id = 'scoreboardContainer';
+            // Position scoreboard above canvas
+            this.canvas.parentElement.style.marginTop = '80px'; // Make room for scoreboard
+            this.canvas.parentElement.style.position = 'relative';
+            scoreboardContainer.style.position = 'absolute';
+            scoreboardContainer.style.left = '0';
+            scoreboardContainer.style.top = '-80px';
+            scoreboardContainer.style.width = '100%';
+            scoreboardContainer.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
+            scoreboardContainer.style.padding = '10px';
+            scoreboardContainer.style.borderRadius = '8px';
+            scoreboardContainer.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+            scoreboardContainer.style.fontFamily = 'Arial, sans-serif';
+            scoreboardContainer.style.display = 'flex';
+            scoreboardContainer.style.justifyContent = 'space-between';
+            scoreboardContainer.style.alignItems = 'center';
+            this.canvas.parentElement.appendChild(scoreboardContainer);
+        }
 
-        // Draw puck counts more compactly
-        this.ctx.font = '18px Arial';
-        
-        // P1 puck count on left
-        this.ctx.fillStyle = '#ff4444';
-        this.ctx.fillText(`P1: ${CONFIG.PUCK.MAX_PUCKS_PER_PLAYER - this.gameState.puckCounts.player1}`, 20, 35);
-        
-        // P2 puck count on right
-        this.ctx.fillStyle = '#4444ff';
-        this.ctx.fillText(`P2: ${CONFIG.PUCK.MAX_PUCKS_PER_PLAYER - this.gameState.puckCounts.player2}`, 110, 35);
+        // Update scoreboard content
+        const p1Pucks = CONFIG.PUCK.MAX_PUCKS_PER_PLAYER - this.gameState.puckCounts.player1;
+        const p2Pucks = CONFIG.PUCK.MAX_PUCKS_PER_PLAYER - this.gameState.puckCounts.player2;
 
-        // Draw score box below puck counts
-        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-        this.ctx.fillRect(10, 60, 200, 80);
-        this.ctx.strokeStyle = '#333';
-        this.ctx.strokeRect(10, 60, 200, 80);
+        let scoreContent = `
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <div style="font-weight: bold; font-size: 14px;">PUCKS LEFT:</div>
+                <div style="display: flex; gap: 20px;">
+                    <span style="color: #ff4444; font-weight: bold;">Red: ${p1Pucks}</span>
+                    <span style="color: #4444ff; font-weight: bold;">Blue: ${p2Pucks}</span>
+                </div>
+            </div>
+        `;
 
-        // Draw scores
-        this.ctx.font = 'bold 24px Arial';
-        
-        // Player 1 score
-        this.ctx.fillStyle = '#ff4444';
-        this.ctx.shadowColor = 'rgba(255, 0, 0, 0.3)';
-        this.ctx.shadowBlur = 5;
-        
         if (this.gameState.gameMode === CONFIG.GAME_MODES.TERRITORY) {
             const territoryScore1 = this.gameState.scores.player1 - (this.gameState.collisionScores?.player1 || 0);
-            this.ctx.fillText(`P1: ${territoryScore1} + ${this.gameState.collisionScores?.player1 || 0}`, 20, 85);
-        } else {
-            this.ctx.fillText(`P1: ${this.gameState.scores.player1}`, 20, 85);
-        }
-        
-        // Player 2 score
-        this.ctx.fillStyle = '#4444ff';
-        this.ctx.shadowColor = 'rgba(0, 0, 255, 0.3)';
-        this.ctx.shadowBlur = 5;
-        
-        if (this.gameState.gameMode === CONFIG.GAME_MODES.TERRITORY) {
             const territoryScore2 = this.gameState.scores.player2 - (this.gameState.collisionScores?.player2 || 0);
-            this.ctx.fillText(`P2: ${territoryScore2} + ${this.gameState.collisionScores?.player2 || 0}`, 20, 115);
+            const collisionScore1 = this.gameState.collisionScores?.player1 || 0;
+            const collisionScore2 = this.gameState.collisionScores?.player2 || 0;
+            const totalScore1 = this.gameState.scores.player1;
+            const totalScore2 = this.gameState.scores.player2;
+
+            scoreContent += `
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <div style="font-weight: bold; font-size: 14px;">TERRITORY:</div>
+                    <div style="display: flex; gap: 20px;">
+                        <div style="color: #ff4444;">
+                            <span style="font-weight: bold;">Red: ${totalScore1}</span>
+                            <span style="font-size: 12px;">(Area: ${territoryScore1} + Hits: ${collisionScore1})</span>
+                        </div>
+                        <div style="color: #4444ff;">
+                            <span style="font-weight: bold;">Blue: ${totalScore2}</span>
+                            <span style="font-size: 12px;">(Area: ${territoryScore2} + Hits: ${collisionScore2})</span>
+                        </div>
+                    </div>
+                </div>
+                <div style="font-weight: bold; color: ${totalScore1 > totalScore2 ? '#ff4444' : '#4444ff'};">
+                    ${totalScore1 > totalScore2 ? '🏆 Red Leading!' : totalScore2 > totalScore1 ? '🏆 Blue Leading!' : 'Tied Game!'}
+                </div>
+            `;
         } else {
-            this.ctx.fillText(`P2: ${this.gameState.scores.player2}`, 20, 115);
+            scoreContent += `
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <div style="font-weight: bold; font-size: 14px;">SCORES:</div>
+                    <div style="display: flex; gap: 20px;">
+                        <span style="color: #ff4444; font-weight: bold;">Red: ${this.gameState.scores.player1}</span>
+                        <span style="color: #4444ff; font-weight: bold;">Blue: ${this.gameState.scores.player2}</span>
+                    </div>
+                    <div style="font-weight: bold; color: ${this.gameState.scores.player1 > this.gameState.scores.player2 ? '#ff4444' : '#4444ff'};">
+                        ${this.gameState.scores.player1 > this.gameState.scores.player2 ? '🏆 Red Leading!' : 
+                          this.gameState.scores.player2 > this.gameState.scores.player1 ? '🏆 Blue Leading!' : 'Tied Game!'}
+                    </div>
+                </div>
+            `;
         }
-        
-        this.ctx.restore();
+
+        scoreboardContainer.innerHTML = scoreContent;
     }
 
     drawLaunchDirectionArrow(puck, center) {
@@ -1612,4 +1666,4 @@ class Game {
 // Modify the startGame function to accept player info
 window.startGame = function(playerNumber, socket, roomId, gameMode) {
     new Game(playerNumber, socket, roomId, gameMode);
-}; 
+};
