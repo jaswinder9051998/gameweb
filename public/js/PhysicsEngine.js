@@ -178,6 +178,29 @@ export class PhysicsEngine {
 
             // Handle repulsion first
             if (puck.hasRepel && distance < CONFIG.PUCK.REPEL_RADIUS) {
+                console.log('=== Magnetic Repulsion ===', {
+                    distance,
+                    repelRadius: CONFIG.PUCK.REPEL_RADIUS
+                });
+                
+                // Enforce minimum separation (stronger repulsion at closer distances)
+                const minDistance = CONFIG.PUCK.RADIUS * 5; // Keep pucks at least 5x radius apart
+                if (distance < minDistance) {
+                    // Move pucks apart to maintain minimum distance
+                    const separation = (minDistance - distance) / 2;
+                    const nx = dx / distance;
+                    const ny = dy / distance;
+                    
+                    // Move repelling puck back
+                    puck.x += nx * separation;
+                    puck.y += ny * separation;
+                    
+                    // Move other puck away
+                    otherPuck.x -= nx * separation;
+                    otherPuck.y -= ny * separation;
+                }
+
+                // Apply repel force (inverse square law like real magnets)
                 this.applyRepelForce(puck, otherPuck, dx, dy, distance);
                 
                 // Skip collision handling completely for repelling pucks
@@ -211,9 +234,7 @@ export class PhysicsEngine {
     }
 
     applyRepelForce(puck, otherPuck, dx, dy, distance) {
-        const dx = otherPuck.x - puck.x;
-        const dy = otherPuck.y - puck.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
+        console.log('=== Repel Force Start ===');
         
         // Calculate repel force using inverse square law (like real magnets)
         // Force increases dramatically as distance decreases
@@ -224,6 +245,12 @@ export class PhysicsEngine {
         // Direction should be away from repelling puck
         const nx = -dx / distance;
         const ny = -dy / distance;
+
+        console.log('Magnetic Force:', {
+            distance,
+            force,
+            direction: { nx, ny }
+        });
 
         // Calculate velocity changes with stronger effect at close range
         const dvx = nx * force;

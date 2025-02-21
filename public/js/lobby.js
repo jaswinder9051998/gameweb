@@ -22,7 +22,11 @@ try {
     });
 
     socket.on('connect', () => {
-        updateConnectionStatus('Connected');
+        console.log('Connected to server');
+        console.log('Socket ID:', socket.id);
+        console.log('Transport:', socket.io.engine.transport.name);
+        enableButtons(true);
+        lobbyMessage.textContent = 'Connected to server';
     });
 
     socket.on('connect_error', (error) => {
@@ -33,7 +37,9 @@ try {
     });
 
     socket.on('disconnect', (reason) => {
-        updateConnectionStatus('Disconnected');
+        console.log('Disconnected from server. Reason:', reason);
+        lobbyMessage.textContent = `Disconnected: ${reason}. Trying to reconnect...`;
+        enableButtons(false);
     });
 
     socket.on('error', (error) => {
@@ -84,20 +90,27 @@ territoryModeBtn.classList.add('selected');     // Add selection to territory mo
 
 // Add mode selection handlers
 collisionModeBtn.addEventListener('click', () => {
+    console.log('Collision mode clicked');
     selectedMode = GAME_MODES.COLLISION;
-    updateModeSelection();
+    collisionModeBtn.classList.add('selected');
+    territoryModeBtn.classList.remove('selected');
 });
 
 territoryModeBtn.addEventListener('click', () => {
     selectedMode = GAME_MODES.TERRITORY;
     territoryModeBtn.classList.add('selected');
     collisionModeBtn.classList.remove('selected');
+    console.log('Selected mode:', selectedMode); // Debug log
 });
 
 // When "Create Room" is clicked
 createRoomBtn.addEventListener('click', () => {
+    console.log('Create room clicked');
+    console.log('Selected mode:', selectedMode);
+    console.log('Socket connected:', socket.connected);
+    
     if (!socket.connected) {
-        showError('Not connected to server');
+        lobbyMessage.textContent = 'Not connected to server. Please wait...';
         return;
     }
     
@@ -194,30 +207,4 @@ const lobbyControls = document.querySelector('.lobby-controls');
 lobbyControls.appendChild(showRulesButton);
 
 // Hide rules overlay initially
-rulesOverlay.style.display = 'none';
-
-function updateConnectionStatus(status) {
-    lobbyMessage.textContent = status;
-}
-
-function updateModeSelection() {
-    collisionModeBtn.classList.toggle('selected', selectedMode === GAME_MODES.COLLISION);
-    territoryModeBtn.classList.toggle('selected', selectedMode === GAME_MODES.TERRITORY);
-}
-
-function showError(message) {
-    lobbyMessage.textContent = message;
-}
-
-function handleCreateRoom() {
-    if (!socket.connected) {
-        showError('Not connected to server');
-        return;
-    }
-    socket.emit('createRoom', { gameMode: selectedMode });
-}
-
-function handleCollisionModeClick() {
-    selectedMode = CONFIG.GAME_MODES.COLLISION;
-    updateModeSelection();
-} 
+rulesOverlay.style.display = 'none'; 

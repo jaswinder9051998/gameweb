@@ -82,7 +82,7 @@ export class Game {
         this.ui.createPlayAgainButton();
         this.ui.createRepelButton();
         this.ui.createGhostButton();
-        this.gameMode = gameMode;
+        console.log('Game initialized in mode:', gameMode);
         this.gameLoop();
     }
 
