@@ -65,10 +65,16 @@ export class Game {
                 win: new Audio('sounds/win.mp3')
             },
             gameMode: gameMode || CONFIG.GAME_MODES.COLLISION,
-            territoryGrid: this.territory.createGrid()
+            territoryGrid: this.territory.createGrid(),
+            repelPower: {
+                player1: false,
+                player2: false,
+                activePuck: null
+            }
         };
 
         this.ui.createPlayAgainButton();
+        this.ui.createRepelButton();
         console.log('Game initialized in mode:', gameMode);
         this.gameLoop();
     }
@@ -159,7 +165,8 @@ export class Game {
                 x: data.puck.x,
                 y: data.puck.y,
                 vx: data.puck.vx,
-                vy: data.puck.vy
+                vy: data.puck.vy,
+                hasRepel: data.puck.hasRepel
             };
 
             this.gameState.pucks.push(puck);
@@ -168,6 +175,9 @@ export class Game {
         } 
         else if (data.type === 'collision') {
             this.physics.handleNetworkCollision(data);
+        }
+        else if (data.type === 'repelActivated') {
+            this.gameState.repelPower[`player${data.player}`] = true;
         }
         else if (data.type === 'reset') {
             this.resetGame();

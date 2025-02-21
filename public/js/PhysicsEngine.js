@@ -164,6 +164,38 @@ export class PhysicsEngine {
             const dy = puck.y - otherPuck.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
 
+            // Handle repulsion first
+            if (puck.hasRepel && distance < CONFIG.PUCK.REPEL_RADIUS) {
+                console.log('=== Magnetic Repulsion ===', {
+                    distance,
+                    repelRadius: CONFIG.PUCK.REPEL_RADIUS
+                });
+                
+                // Enforce minimum separation (stronger repulsion at closer distances)
+                const minDistance = CONFIG.PUCK.RADIUS * 5; // Keep pucks at least 5x radius apart
+                if (distance < minDistance) {
+                    // Move pucks apart to maintain minimum distance
+                    const separation = (minDistance - distance) / 2;
+                    const nx = dx / distance;
+                    const ny = dy / distance;
+                    
+                    // Move repelling puck back
+                    puck.x += nx * separation;
+                    puck.y += ny * separation;
+                    
+                    // Move other puck away
+                    otherPuck.x -= nx * separation;
+                    otherPuck.y -= ny * separation;
+                }
+
+                // Apply repel force (inverse square law like real magnets)
+                this.applyRepelForce(puck, otherPuck, dx, dy, distance);
+                
+                // Skip collision handling completely for repelling pucks
+                continue;
+            }
+
+            // Normal collision handling (only if not repelling)
             if (distance < CONFIG.PUCK.RADIUS * 2) {
                 if (this.game.gameState.activePlayer === this.game.playerNumber) {
                     this.game.socket.emit('gameMove', {
@@ -186,6 +218,59 @@ export class PhysicsEngine {
 
                 this.resolvePuckCollision(puck, otherPuck, dx, dy, distance);
             }
+        }
+    }
+
+    applyRepelForce(puck, otherPuck, dx, dy, distance) {
+        console.log('=== Repel Force Start ===');
+        
+        // Calculate repel force using inverse square law (like real magnets)
+        // Force increases dramatically as distance decreases
+        const distanceRatio = distance / CONFIG.PUCK.REPEL_RADIUS;
+        // Increased base force for stronger repulsion at 5x radius
+        const force = CONFIG.PUCK.REPEL_FORCE * 1.5 * (1 / (distanceRatio * distanceRatio));
+        
+        // Direction should be away from repelling puck
+        const nx = -dx / distance;
+        const ny = -dy / distance;
+
+        console.log('Magnetic Force:', {
+            distance,
+            force,
+            direction: { nx, ny }
+        });
+
+        // Calculate velocity changes with stronger effect at close range
+        const dvx = nx * force;
+        const dvy = ny * force;
+        
+        // Apply velocity changes to other puck with increased effect
+        otherPuck.vx = (otherPuck.vx || 0) + dvx;
+        otherPuck.vy = (otherPuck.vy || 0) + dvy;
+
+        // Create repel effect visual (more intense at closer ranges)
+        const intensity = Math.min(1, CONFIG.PUCK.REPEL_RADIUS / distance);
+        this.createRepelEffect(puck.x, puck.y, otherPuck.x, otherPuck.y, intensity);
+    }
+
+    createRepelEffect(x1, y1, x2, y2, intensity) {
+        const sparks = Math.floor(5 * intensity); // More sparks at closer ranges
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        
+        for (let i = 0; i < sparks; i++) {
+            const sparkAngle = angle + (Math.random() - 0.5) * Math.PI / 4;
+            const speed = (Math.random() * 2 + 2) * intensity;
+            
+            const spark = {
+                x: (x1 + x2) / 2,
+                y: (y1 + y2) / 2,
+                vx: Math.cos(sparkAngle) * speed,
+                vy: Math.sin(sparkAngle) * speed,
+                life: 1,
+                color: '#00ff00'
+            };
+            
+            this.game.gameState.sparks.push(spark);
         }
     }
 
@@ -374,13 +459,21 @@ export class PhysicsEngine {
             y: launchDirection.y * launchSpeed
         };
 
+        const playerKey = `player${this.game.gameState.activePlayer}`;
+        const hasRepel = this.game.gameState.repelPower[playerKey];
+
         const launchedPuck = {
             x: this.game.gameState.currentPuck.x,
             y: this.game.gameState.currentPuck.y,
             vx: velocity.x,
             vy: velocity.y,
-            player: this.game.gameState.activePlayer
+            player: this.game.gameState.activePlayer,
+            hasRepel: hasRepel
         };
+
+        if (hasRepel) {
+            this.game.gameState.repelPower.activePuck = launchedPuck;
+        }
 
         this.game.socket.emit('gameMove', {
             roomId: this.game.roomId,

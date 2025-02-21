@@ -4,6 +4,8 @@ export class UIManager {
     constructor(game) {
         this.game = game;
         this.createScoreboard();
+        this.errorMessages = [];
+        this.gameStateMessages = [];
     }
 
     createScoreboard() {
@@ -67,8 +69,66 @@ export class UIManager {
         }
     }
 
+    createRepelButton() {
+        const button = document.createElement('button');
+        button.id = 'repelButton';
+        button.className = 'game-button';
+        button.textContent = 'Repel Power';
+        button.style.position = 'absolute';
+        button.style.bottom = CONFIG.UI.REPEL_BUTTON.MARGIN + 'px';
+        button.style.left = '50%';
+        button.style.transform = 'translateX(-50%)';
+        button.style.width = CONFIG.UI.REPEL_BUTTON.WIDTH + 'px';
+        button.style.height = CONFIG.UI.REPEL_BUTTON.HEIGHT + 'px';
+        button.style.display = 'block';
+        button.style.backgroundColor = '#4CAF50';
+        button.style.color = 'white';
+        button.style.border = 'none';
+        button.style.borderRadius = '5px';
+        button.style.cursor = 'pointer';
+        
+        button.addEventListener('click', () => this.handleRepelButtonClick());
+        
+        document.body.appendChild(button);
+        this.repelButton = button;
+    }
+
+    handleRepelButtonClick() {
+        if (this.game.playerNumber !== this.game.gameState.activePlayer) {
+            return; // Not this player's turn
+        }
+
+        const playerKey = `player${this.game.playerNumber}`;
+        if (this.game.gameState.repelPower[playerKey]) {
+            return; // Already used repel power
+        }
+
+        this.game.gameState.repelPower[playerKey] = true;
+        this.repelButton.style.backgroundColor = '#ccc';
+        this.repelButton.disabled = true;
+
+        // Notify other players
+        this.game.socket.emit('gameMove', {
+            roomId: this.game.roomId,
+            type: 'repelActivated',
+            player: this.game.playerNumber
+        });
+    }
+
+    updateRepelButton() {
+        if (!this.repelButton) return;
+        
+        const playerKey = `player${this.game.playerNumber}`;
+        const isUsed = this.game.gameState.repelPower[playerKey];
+        const isPlayerTurn = this.game.playerNumber === this.game.gameState.activePlayer;
+        
+        this.repelButton.disabled = isUsed || !isPlayerTurn;
+        this.repelButton.style.backgroundColor = isUsed ? '#ccc' : (isPlayerTurn ? '#4CAF50' : '#666');
+    }
+
     update() {
         this.updateScoreboard();
+        this.updateRepelButton();
     }
 
     updateScoreboard() {

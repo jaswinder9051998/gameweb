@@ -252,45 +252,28 @@ export class Renderer {
     }
 
     drawSparks() {
+        if (!this.game.gameState.sparks) return;
+        
         this.game.gameState.sparks.forEach(spark => {
+            console.log('Drawing spark:', {
+                position: { x: spark.x, y: spark.y },
+                life: spark.life,
+                color: spark.color
+            });
+
             this.ctx.save();
-            this.ctx.translate(spark.x, spark.y);
-            this.ctx.rotate(spark.rotation);
+            const gradient = this.ctx.createRadialGradient(
+                spark.x, spark.y, 0,
+                spark.x, spark.y, 5 * spark.life
+            );
             
-            this.ctx.shadowColor = 'rgba(255, 215, 0, 0.6)';
-            this.ctx.shadowBlur = 10;
-            
-            this.ctx.beginPath();
-            
-            const gradient = this.ctx.createRadialGradient(0, 0, 0, 0, 0, spark.size * 2);
-            gradient.addColorStop(0, 'rgba(255, 255, 200, 1)');
-            gradient.addColorStop(0.3, 'rgba(255, 215, 0, 1)');
-            gradient.addColorStop(0.6, 'rgba(255, 180, 0, 1)');
-            gradient.addColorStop(1, 'rgba(255, 140, 0, 0)');
+            gradient.addColorStop(0, spark.color || '#fff');
+            gradient.addColorStop(1, 'transparent');
             
             this.ctx.fillStyle = gradient;
-            this.ctx.strokeStyle = 'rgba(255, 200, 0, 1)';
-            this.ctx.lineWidth = spark.size;
-            this.ctx.globalAlpha = spark.life;
-            
-            const outerRadius = spark.size * 2;
-            const innerRadius = spark.size;
-            const points = 4;
-            
-            for (let i = 0; i < points * 2; i++) {
-                const radius = i % 2 === 0 ? outerRadius : innerRadius;
-                const angle = (i * Math.PI) / points;
-                if (i === 0) {
-                    this.ctx.moveTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
-                } else {
-                    this.ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
-                }
-            }
-            this.ctx.closePath();
-            
+            this.ctx.beginPath();
+            this.ctx.arc(spark.x, spark.y, 5 * spark.life, 0, Math.PI * 2);
             this.ctx.fill();
-            this.ctx.stroke();
-            
             this.ctx.restore();
         });
     }

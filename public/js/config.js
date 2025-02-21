@@ -9,7 +9,9 @@ export const CONFIG = {
         MAX_CHARGE_TIME: 3000,
         MAX_LAUNCH_SPEED: 20,
         MIN_LAUNCH_SPEED: 5,
-        MAX_PUCKS_PER_PLAYER: 5
+        MAX_PUCKS_PER_PLAYER: 5,
+        REPEL_RADIUS: 60,
+        REPEL_FORCE: 5,
     },
     PHYSICS: {
         FRICTION: 0.95,         // Increased friction for faster slowdown
@@ -29,7 +31,12 @@ export const CONFIG = {
         TURN_INDICATOR: {
             HEIGHT: 4,
             MARGIN: 5
-        }
+        },
+        REPEL_BUTTON: {
+            WIDTH: 100,
+            HEIGHT: 40,
+            MARGIN: 10
+        },
     },
     SOUNDS: {
         COLLISION: 'collision.mp3',
