@@ -6,94 +6,17 @@ export class UIManager {
         this.createScoreboard();
         this.errorMessages = [];
         this.gameStateMessages = [];
-
-        // Enhanced mobile-specific logging
-        this.logMobileMetrics();
-        window.addEventListener('resize', () => this.logMobileMetrics());
     }
 
-    logMobileMetrics() {
-        const scoreboardRect = this.scoreboardContainer?.getBoundingClientRect();
-        const canvasRect = this.game.canvas.getBoundingClientRect();
-        const containerRect = this.game.canvas.parentElement.getBoundingClientRect();
-
-        console.log('=== Mobile Responsive Metrics ===', {
-            viewport: {
-                width: window.innerWidth,
-                height: window.innerHeight,
-                devicePixelRatio: window.devicePixelRatio,
-                orientation: window.screen.orientation?.type || 'N/A'
-            },
-            canvas: {
-                width: this.game.canvas.width,
-                height: this.game.canvas.height,
-                displayWidth: canvasRect.width,
-                displayHeight: canvasRect.height,
-                scale: canvasRect.width / this.game.canvas.width,
-                viewportPercentage: (canvasRect.width / window.innerWidth) * 100
-            },
-            scoreboard: scoreboardRect ? {
-                width: scoreboardRect.width,
-                height: scoreboardRect.height,
-                top: scoreboardRect.top,
-                viewportPercentage: (scoreboardRect.width / window.innerWidth) * 100,
-                computedStyle: window.getComputedStyle(this.scoreboardContainer)
-            } : 'Not created yet',
-            container: {
-                width: containerRect.width,
-                height: containerRect.height,
-                margins: {
-                    top: window.getComputedStyle(this.game.canvas.parentElement).marginTop,
-                    bottom: window.getComputedStyle(this.game.canvas.parentElement).marginBottom
-                },
-                viewportPercentage: (containerRect.width / window.innerWidth) * 100
-            },
-            textScaling: {
-                defaultFontSize: window.getComputedStyle(document.documentElement).fontSize,
-                viewportWidth: `${window.innerWidth / 100}px`, // 1vw
-                viewportHeight: `${window.innerHeight / 100}px` // 1vh
-            }
+    hasFixedUnits() {
+        const elements = [this.scoreboardContainer, this.repelButton, this.ghostButton].filter(Boolean);
+        return elements.some(el => {
+            const style = window.getComputedStyle(el);
+            return style.width.includes('px') || 
+                   style.height.includes('px') || 
+                   style.margin.includes('px') || 
+                   style.padding.includes('px');
         });
-
-        // Log potential overflow issues
-        if (this.scoreboardContainer) {
-            const isOverflowing = this.scoreboardContainer.scrollWidth > this.scoreboardContainer.clientWidth;
-            console.log('=== Scoreboard Overflow Check ===', {
-                isOverflowing,
-                scrollWidth: this.scoreboardContainer.scrollWidth,
-                clientWidth: this.scoreboardContainer.clientWidth,
-                contentWidth: Array.from(this.scoreboardContainer.children).reduce((total, child) => 
-                    total + child.getBoundingClientRect().width, 0)
-            });
-        }
-
-        // Check button sizing and spacing on mobile
-        if (this.repelButton && this.ghostButton) {
-            const repelRect = this.repelButton.getBoundingClientRect();
-            const ghostRect = this.ghostButton.getBoundingClientRect();
-            console.log('=== Mobile Button Metrics ===', {
-                repelButton: {
-                    width: repelRect.width,
-                    height: repelRect.height,
-                    viewportWidthPercentage: (repelRect.width / window.innerWidth) * 100,
-                    bottom: window.innerHeight - repelRect.bottom
-                },
-                ghostButton: {
-                    width: ghostRect.width,
-                    height: ghostRect.height,
-                    viewportWidthPercentage: (ghostRect.width / window.innerWidth) * 100,
-                    bottom: window.innerHeight - ghostRect.bottom
-                },
-                spacing: {
-                    betweenButtons: ghostRect.left - repelRect.right,
-                    viewportPercentage: ((ghostRect.left - repelRect.right) / window.innerWidth) * 100
-                },
-                totalButtonsWidth: {
-                    pixels: repelRect.width + ghostRect.width,
-                    viewportPercentage: ((repelRect.width + ghostRect.width) / window.innerWidth) * 100
-                }
-            });
-        }
     }
 
     createScoreboard() {
@@ -358,25 +281,64 @@ export class UIManager {
         this.game.canvas.parentElement.appendChild(button);
         this.ghostButton = button;
 
-        // Log detailed button metrics
+        // Add comprehensive size relationship logging
         requestAnimationFrame(() => {
             const buttonRect = button.getBoundingClientRect();
             const repelRect = this.repelButton.getBoundingClientRect();
-            console.log('=== Ghost Button Detailed Metrics ===', {
-                dimensions: {
-                    width: buttonRect.width,
-                    height: buttonRect.height,
-                    computedStyle: window.getComputedStyle(button)
+            const containerRect = this.game.canvas.parentElement.getBoundingClientRect();
+            const canvasRect = this.game.canvas.getBoundingClientRect();
+            const scoreboardRect = this.scoreboardContainer.getBoundingClientRect();
+            
+            console.log('=== Size Relationships Analysis ===', {
+                containerVsElements: {
+                    container: containerRect.width,
+                    canvas: {
+                        width: canvasRect.width,
+                        overflowAmount: canvasRect.width - containerRect.width,
+                        percentageOfContainer: (canvasRect.width / containerRect.width) * 100
+                    },
+                    scoreboard: {
+                        width: scoreboardRect.width,
+                        overflowAmount: scoreboardRect.width - containerRect.width,
+                        percentageOfContainer: (scoreboardRect.width / containerRect.width) * 100
+                    }
                 },
-                position: {
-                    left: buttonRect.left,
-                    right: buttonRect.right,
-                    distanceFromRepel: buttonRect.left - repelRect.right
+                buttonSpacing: {
+                    totalButtonWidth: repelRect.width + buttonRect.width,
+                    currentSpacing: buttonRect.left - repelRect.right,
+                    minimumRequiredWidth: repelRect.width + buttonRect.width + 50, // 50px minimum spacing
+                    availableWidth: containerRect.width,
+                    isSpacingPossible: (repelRect.width + buttonRect.width + 50) <= containerRect.width,
+                    spaceUtilization: ((repelRect.width + buttonRect.width) / containerRect.width) * 100
                 },
-                clickable: {
-                    pointerEvents: window.getComputedStyle(button).pointerEvents,
-                    zIndex: window.getComputedStyle(button).zIndex,
-                    isVisible: buttonRect.width > 0 && buttonRect.height > 0
+                pixelRatioImpact: {
+                    devicePixelRatio: window.devicePixelRatio,
+                    scaledButtonWidth: repelRect.width * window.devicePixelRatio,
+                    scaledContainerWidth: containerRect.width * window.devicePixelRatio
+                },
+                layoutBreakpoints: {
+                    minWidthForButtons: repelRect.width + buttonRect.width + 50,
+                    minWidthForScoreboard: scoreboardRect.width,
+                    actualWidth: containerRect.width,
+                    isLayoutViable: containerRect.width >= Math.max(
+                        repelRect.width + buttonRect.width + 50,
+                        scoreboardRect.width
+                    )
+                }
+            });
+
+            // Log specific overflow warnings
+            console.log('=== Overflow Analysis ===', {
+                containerOverflow: {
+                    isCanvasOverflowing: canvasRect.width > containerRect.width,
+                    isScoreboardOverflowing: scoreboardRect.width > containerRect.width,
+                    isButtonsOverflowing: (repelRect.width + buttonRect.width + 50) > containerRect.width
+                },
+                spacingIssues: {
+                    currentSpacing: buttonRect.left - repelRect.right,
+                    minimumSpacing: 50,
+                    isSpacingInsufficient: (buttonRect.left - repelRect.right) < 50,
+                    recommendedContainerWidth: repelRect.width + buttonRect.width + 100 // 100px total spacing
                 }
             });
         });
@@ -433,40 +395,17 @@ export class UIManager {
         this.updateScoreboard();
         this.updateRepelButton();
         this.updateGhostButton();
-
-        // Log button positions during updates to check for changes
-        if (this.repelButton && this.ghostButton) {
-            const repelRect = this.repelButton.getBoundingClientRect();
-            const ghostRect = this.ghostButton.getBoundingClientRect();
-            console.log('=== Button Spacing Update ===', {
-                repelLeft: repelRect.left,
-                repelRight: repelRect.right,
-                ghostLeft: ghostRect.left,
-                spacing: ghostRect.left - repelRect.right,
-                containerWidth: this.game.canvas.parentElement.offsetWidth
-            });
-        }
-
-        // Log responsive metrics on window resize
-        if (this.lastWindowWidth !== window.innerWidth) {
-            this.lastWindowWidth = window.innerWidth;
-            this.logMobileMetrics();
-        }
     }
 
     updateScoreboard() {
         if (!this.scoreboardContainer) return;
 
-        const p1Pucks = CONFIG.PUCK.MAX_PUCKS_PER_PLAYER - this.game.gameState.puckCounts.player1;
-        const p2Pucks = CONFIG.PUCK.MAX_PUCKS_PER_PLAYER - this.game.gameState.puckCounts.player2;
+        const playerPucks = CONFIG.PUCK.MAX_PUCKS_PER_PLAYER - 
+            this.game.gameState.puckCounts[`player${this.game.playerNumber}`];
 
         let scoreContent = `
             <div style="display: flex; align-items: center; gap: 20px;">
-                <div style="font-weight: bold; font-size: 14px;">PUCKS LEFT:</div>
-                <div style="display: flex; gap: 20px;">
-                    <span style="color: #ff4444; font-weight: bold;">Red: ${p1Pucks}</span>
-                    <span style="color: #4444ff; font-weight: bold;">Blue: ${p2Pucks}</span>
-                </div>
+                <div style="font-weight: bold; font-size: 14px;">PUCKS LEFT: ${playerPucks}</div>
             </div>
         `;
 
@@ -491,7 +430,6 @@ export class UIManager {
 
         return `
             <div style="display: flex; align-items: center; gap: 20px;">
-                <div style="font-weight: bold; font-size: 14px;">TERRITORY:</div>
                 <div style="display: flex; gap: 20px;">
                     <div style="color: #ff4444;">
                         <span style="font-weight: bold;">Red: ${totalScore1}</span>
