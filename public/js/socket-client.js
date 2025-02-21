@@ -13,35 +13,16 @@ const socket = io(window.location.origin, {
 let reconnectAttempts = 0;
 
 socket.on('connect', () => {
-    console.log('Connected to server with ID:', socket.id);
-    reconnectAttempts = 0; // Reset counter on successful connection
+    // Handle connection silently
 });
 
 socket.on('connect_error', (error) => {
     reconnectAttempts++;
-    console.error('Connection error details:', {
-        attempt: reconnectAttempts,
-        type: error.type,
-        message: error.message,
-        description: error.description,
-        transport: socket.io?.engine?.transport?.name || 'unknown'
-    });
-    
-    // Force transport change after multiple failures
-    if (reconnectAttempts > 3) {
-        const currentTransport = socket.io.engine.transport.name;
-        if (currentTransport === 'websocket') {
-            console.log('Falling back to polling...');
-            socket.io.opts.transports = ['polling'];
-        } else {
-            console.log('Trying websocket...');
-            socket.io.opts.transports = ['websocket'];
-        }
-    }
+    // Handle connection error silently
 });
 
 socket.on('disconnect', (reason) => {
-    console.log('Disconnected:', reason);
+    // Handle disconnection silently
     if (reason === 'io server disconnect' || reason === 'transport close') {
         console.log('Attempting reconnection...');
         socket.connect();
@@ -49,11 +30,11 @@ socket.on('disconnect', (reason) => {
 });
 
 socket.on('reconnect_attempt', (attemptNumber) => {
-    console.log('Attempting reconnection:', attemptNumber);
+    // Handle reconnection attempt silently
 });
 
 socket.on('reconnect_failed', () => {
-    console.log('Reconnection failed, trying alternative transport...');
+    // Handle reconnection failure silently
     // Toggle transport method
     const currentTransport = socket.io.engine.transport.name;
     socket.io.opts.transports = [currentTransport === 'websocket' ? 'polling' : 'websocket'];
@@ -62,9 +43,5 @@ socket.on('reconnect_failed', () => {
 
 // Monitor connection state
 setInterval(() => {
-    console.log('Connection state:', {
-        connected: socket.connected,
-        disconnected: socket.disconnected,
-        transport: socket.io?.engine?.transport?.name
-    });
+    // Handle connection state monitoring silently
 }, 5000); 
