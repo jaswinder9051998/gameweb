@@ -109,8 +109,8 @@ export class UIManager {
 
         // Position button under the canvas
         button.style.position = 'absolute';
-        button.style.left = '50%';
-        button.style.transform = 'translateX(-50%)';
+        button.style.left = '20px';
+        button.style.transform = 'none';
         button.style.bottom = '-60px';
         button.style.zIndex = '100';
         
@@ -245,8 +245,8 @@ export class UIManager {
 
         // Position button under the canvas next to repel button
         button.style.position = 'absolute';
-        button.style.left = 'calc(50% + 200px)'; // Increased offset
-        button.style.transform = 'translateX(-50%)';
+        button.style.left = '180px';
+        button.style.transform = 'none';
         button.style.bottom = '-60px';
         button.style.zIndex = '100';
         
