@@ -6,6 +6,26 @@ export class UIManager {
         this.createScoreboard();
         this.errorMessages = [];
         this.gameStateMessages = [];
+        
+        // Log initial viewport metrics
+        console.log('=== Initial Viewport ===', {
+            width: window.innerWidth,
+            height: window.innerHeight,
+            devicePixelRatio: window.devicePixelRatio,
+            visualViewport: {
+                width: window.visualViewport?.width,
+                scale: window.visualViewport?.scale
+            }
+        });
+
+        // Monitor orientation changes
+        window.addEventListener('orientationchange', () => {
+            console.log('=== Orientation Change ===', {
+                orientation: window.screen.orientation?.type,
+                width: window.innerWidth,
+                height: window.innerHeight
+            });
+        });
     }
 
     hasFixedUnits() {
@@ -80,7 +100,42 @@ export class UIManager {
         }
     }
 
+    createButtonContainer() {
+        const container = document.createElement('div');
+        container.id = 'powerButtonContainer';
+        container.style.position = 'absolute';
+        container.style.left = '0';
+        container.style.right = '0';
+        container.style.bottom = '-60px';
+        container.style.display = 'flex';
+        container.style.justifyContent = 'center';
+        container.style.gap = '10px';
+        container.style.padding = '10px';
+        container.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
+        container.style.borderRadius = '12px';
+        
+        // Log container creation
+        requestAnimationFrame(() => {
+            const rect = container.getBoundingClientRect();
+            console.log('=== Button Container Metrics ===', {
+                width: rect.width,
+                height: rect.height,
+                bottom: rect.bottom,
+                viewportHeight: window.innerHeight,
+                spaceBelow: window.innerHeight - rect.bottom
+            });
+        });
+
+        this.game.canvas.parentElement.appendChild(container);
+        return container;
+    }
+
     createRepelButton() {
+        // Create button container if it doesn't exist
+        if (!this.buttonContainer) {
+            this.buttonContainer = this.createButtonContainer();
+        }
+
         const button = document.createElement('button');
         button.id = 'repelButton';
         button.className = 'game-button';
@@ -100,22 +155,15 @@ export class UIManager {
         // Add text
         const text = document.createElement('span');
         text.textContent = 'Repel Power';
-        text.style.fontSize = '16px';
+        text.style.fontSize = '14px';
         text.style.fontWeight = '600';
 
         buttonContent.appendChild(icon);
         buttonContent.appendChild(text);
         button.appendChild(buttonContent);
-
-        // Position button under the canvas
-        button.style.position = 'absolute';
-        button.style.left = '20px';
-        button.style.transform = 'none';
-        button.style.bottom = '-60px';
-        button.style.zIndex = '100';
         
         // Modern button styling
-        button.style.padding = '12px 24px';
+        button.style.padding = '8px 16px';
         button.style.backgroundColor = '#4CAF50';
         button.style.color = 'white';
         button.style.border = 'none';
@@ -123,10 +171,12 @@ export class UIManager {
         button.style.cursor = 'pointer';
         button.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
         button.style.transition = 'all 0.3s ease';
+        button.style.flex = '1';
+        button.style.minWidth = '0';
+        button.style.maxWidth = '160px';
 
         // Add click handler and hover effects
         button.addEventListener('click', () => {
-            console.log('Repel button clicked');
             this.handleRepelButtonClick();
         });
 
@@ -142,34 +192,30 @@ export class UIManager {
             }
         });
 
-        // Add button to the canvas container
-        this.game.canvas.parentElement.appendChild(button);
+        this.buttonContainer.appendChild(button);
         this.repelButton = button;
 
-        // Log detailed button metrics
+        // Log button metrics after render
         requestAnimationFrame(() => {
-            const buttonRect = button.getBoundingClientRect();
-            console.log('=== Repel Button Detailed Metrics ===', {
-                dimensions: {
-                    width: buttonRect.width,
-                    height: buttonRect.height,
-                    computedStyle: window.getComputedStyle(button)
-                },
-                position: {
-                    left: buttonRect.left,
-                    right: buttonRect.right,
-                    centerOffset: buttonRect.left + (buttonRect.width / 2) - (window.innerWidth / 2)
-                },
-                clickable: {
-                    pointerEvents: window.getComputedStyle(button).pointerEvents,
-                    zIndex: window.getComputedStyle(button).zIndex,
-                    isVisible: buttonRect.width > 0 && buttonRect.height > 0
-                }
-            });
+            if (this.repelButton) {
+                const rect = this.repelButton.getBoundingClientRect();
+                console.log('=== Repel Button Size ===', {
+                    width: rect.width,
+                    height: rect.height,
+                    fontSize: window.getComputedStyle(text).fontSize,
+                    isClickable: !this.repelButton.disabled
+                });
+            }
         });
     }
 
     handleRepelButtonClick() {
+        console.log('=== Repel Button Click ===', {
+            isPlayerTurn: this.game.playerNumber === this.game.gameState.activePlayer,
+            playerNumber: this.game.playerNumber,
+            activePlayer: this.game.gameState.activePlayer
+        });
+
         if (this.game.playerNumber !== this.game.gameState.activePlayer) {
             return; // Not this player's turn
         }
@@ -236,22 +282,15 @@ export class UIManager {
         // Add text
         const text = document.createElement('span');
         text.textContent = 'Ghost Power';
-        text.style.fontSize = '16px';
+        text.style.fontSize = '14px';
         text.style.fontWeight = '600';
 
         buttonContent.appendChild(icon);
         buttonContent.appendChild(text);
         button.appendChild(buttonContent);
-
-        // Position button under the canvas next to repel button
-        button.style.position = 'absolute';
-        button.style.left = '180px';
-        button.style.transform = 'none';
-        button.style.bottom = '-60px';
-        button.style.zIndex = '100';
         
         // Modern button styling
-        button.style.padding = '12px 24px';
+        button.style.padding = '8px 16px';
         button.style.backgroundColor = '#9b59b6';
         button.style.color = 'white';
         button.style.border = 'none';
@@ -259,10 +298,12 @@ export class UIManager {
         button.style.cursor = 'pointer';
         button.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
         button.style.transition = 'all 0.3s ease';
+        button.style.flex = '1';
+        button.style.minWidth = '0';
+        button.style.maxWidth = '160px';
 
         // Add click handler and hover effects
         button.addEventListener('click', () => {
-            console.log('Ghost button clicked');
             this.handleGhostButtonClick();
         });
 
@@ -278,73 +319,17 @@ export class UIManager {
             }
         });
 
-        this.game.canvas.parentElement.appendChild(button);
+        this.buttonContainer.appendChild(button);
         this.ghostButton = button;
-
-        // Add comprehensive size relationship logging
-        requestAnimationFrame(() => {
-            const buttonRect = button.getBoundingClientRect();
-            const repelRect = this.repelButton.getBoundingClientRect();
-            const containerRect = this.game.canvas.parentElement.getBoundingClientRect();
-            const canvasRect = this.game.canvas.getBoundingClientRect();
-            const scoreboardRect = this.scoreboardContainer.getBoundingClientRect();
-            
-            console.log('=== Size Relationships Analysis ===', {
-                containerVsElements: {
-                    container: containerRect.width,
-                    canvas: {
-                        width: canvasRect.width,
-                        overflowAmount: canvasRect.width - containerRect.width,
-                        percentageOfContainer: (canvasRect.width / containerRect.width) * 100
-                    },
-                    scoreboard: {
-                        width: scoreboardRect.width,
-                        overflowAmount: scoreboardRect.width - containerRect.width,
-                        percentageOfContainer: (scoreboardRect.width / containerRect.width) * 100
-                    }
-                },
-                buttonSpacing: {
-                    totalButtonWidth: repelRect.width + buttonRect.width,
-                    currentSpacing: buttonRect.left - repelRect.right,
-                    minimumRequiredWidth: repelRect.width + buttonRect.width + 50, // 50px minimum spacing
-                    availableWidth: containerRect.width,
-                    isSpacingPossible: (repelRect.width + buttonRect.width + 50) <= containerRect.width,
-                    spaceUtilization: ((repelRect.width + buttonRect.width) / containerRect.width) * 100
-                },
-                pixelRatioImpact: {
-                    devicePixelRatio: window.devicePixelRatio,
-                    scaledButtonWidth: repelRect.width * window.devicePixelRatio,
-                    scaledContainerWidth: containerRect.width * window.devicePixelRatio
-                },
-                layoutBreakpoints: {
-                    minWidthForButtons: repelRect.width + buttonRect.width + 50,
-                    minWidthForScoreboard: scoreboardRect.width,
-                    actualWidth: containerRect.width,
-                    isLayoutViable: containerRect.width >= Math.max(
-                        repelRect.width + buttonRect.width + 50,
-                        scoreboardRect.width
-                    )
-                }
-            });
-
-            // Log specific overflow warnings
-            console.log('=== Overflow Analysis ===', {
-                containerOverflow: {
-                    isCanvasOverflowing: canvasRect.width > containerRect.width,
-                    isScoreboardOverflowing: scoreboardRect.width > containerRect.width,
-                    isButtonsOverflowing: (repelRect.width + buttonRect.width + 50) > containerRect.width
-                },
-                spacingIssues: {
-                    currentSpacing: buttonRect.left - repelRect.right,
-                    minimumSpacing: 50,
-                    isSpacingInsufficient: (buttonRect.left - repelRect.right) < 50,
-                    recommendedContainerWidth: repelRect.width + buttonRect.width + 100 // 100px total spacing
-                }
-            });
-        });
     }
 
     handleGhostButtonClick() {
+        console.log('=== Ghost Button Click ===', {
+            isPlayerTurn: this.game.playerNumber === this.game.gameState.activePlayer,
+            playerNumber: this.game.playerNumber,
+            activePlayer: this.game.gameState.activePlayer
+        });
+
         if (this.game.playerNumber !== this.game.gameState.activePlayer) {
             return; // Not this player's turn
         }
@@ -392,6 +377,21 @@ export class UIManager {
     }
 
     update() {
+        // Track significant UI state changes
+        const playerKey = `player${this.game.playerNumber}`;
+        const currentState = {
+            isPlayerTurn: this.game.playerNumber === this.game.gameState.activePlayer,
+            repelUsed: this.game.gameState.repelPower[playerKey],
+            ghostUsed: this.game.gameState.ghostPower[playerKey],
+            pucksLeft: CONFIG.PUCK.MAX_PUCKS_PER_PLAYER - this.game.gameState.puckCounts[playerKey]
+        };
+
+        // Only log if state changed
+        if (JSON.stringify(currentState) !== JSON.stringify(this.lastState)) {
+            console.log('=== Game State Update ===', currentState);
+            this.lastState = currentState;
+        }
+
         this.updateScoreboard();
         this.updateRepelButton();
         this.updateGhostButton();
