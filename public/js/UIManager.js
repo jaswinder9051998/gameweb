@@ -400,6 +400,29 @@ export class UIManager {
     updateScoreboard() {
         if (!this.scoreboardContainer) return;
 
+        // Log scoreboard metrics before update
+        console.log('=== Scoreboard Layout Analysis ===', {
+            container: {
+                width: this.scoreboardContainer.offsetWidth,
+                height: this.scoreboardContainer.offsetHeight,
+                availableWidth: this.scoreboardContainer.parentElement.offsetWidth,
+                padding: window.getComputedStyle(this.scoreboardContainer).padding,
+                position: this.scoreboardContainer.getBoundingClientRect()
+            },
+            viewport: {
+                width: window.innerWidth,
+                devicePixelRatio: window.devicePixelRatio
+            },
+            contentDensity: {
+                numberOfElements: this.scoreboardContainer.children.length,
+                textContent: this.scoreboardContainer.textContent.length
+            },
+            styleProperties: {
+                fontSize: window.getComputedStyle(this.scoreboardContainer).fontSize,
+                hasFixedUnits: this.hasFixedUnits()
+            }
+        });
+
         const playerPucks = CONFIG.PUCK.MAX_PUCKS_PER_PLAYER - 
             this.game.gameState.puckCounts[`player${this.game.playerNumber}`];
 
@@ -416,6 +439,30 @@ export class UIManager {
         }
 
         this.scoreboardContainer.innerHTML = scoreContent;
+
+        // Log post-update metrics
+        requestAnimationFrame(() => {
+            const contentElements = Array.from(this.scoreboardContainer.getElementsByTagName('*'));
+            console.log('=== Scoreboard Content Analysis ===', {
+                overflow: {
+                    isOverflowing: this.scoreboardContainer.scrollWidth > this.scoreboardContainer.clientWidth,
+                    scrollWidth: this.scoreboardContainer.scrollWidth,
+                    clientWidth: this.scoreboardContainer.clientWidth,
+                    difference: this.scoreboardContainer.scrollWidth - this.scoreboardContainer.clientWidth
+                },
+                elementSizes: contentElements.map(el => ({
+                    type: el.tagName,
+                    width: el.offsetWidth,
+                    textContent: el.textContent.length,
+                    isWrapping: el.scrollWidth > el.clientWidth
+                })),
+                flexLayout: {
+                    gaps: window.getComputedStyle(this.scoreboardContainer).gap,
+                    justification: window.getComputedStyle(this.scoreboardContainer).justifyContent,
+                    flexWrap: window.getComputedStyle(this.scoreboardContainer).flexWrap
+                }
+            });
+        });
     }
 
     getTerritoryScoreContent() {
