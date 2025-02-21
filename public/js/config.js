@@ -12,6 +12,8 @@ export const CONFIG = {
         MAX_PUCKS_PER_PLAYER: 5,
         REPEL_RADIUS: 60,
         REPEL_FORCE: 5,
+        GHOST_DURATION: 3000, // Duration of ghost effect in milliseconds
+        GHOST_OPACITY: 0.5,   // Opacity of ghost puck
     },
     PHYSICS: {
         FRICTION: 0.95,         // Increased friction for faster slowdown
@@ -33,6 +35,11 @@ export const CONFIG = {
             MARGIN: 5
         },
         REPEL_BUTTON: {
+            WIDTH: 100,
+            HEIGHT: 40,
+            MARGIN: 10
+        },
+        GHOST_BUTTON: {
             WIDTH: 100,
             HEIGHT: 40,
             MARGIN: 10

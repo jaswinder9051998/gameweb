@@ -70,11 +70,18 @@ export class Game {
                 player1: false,
                 player2: false,
                 activePuck: null
+            },
+            ghostPower: {
+                player1: false,
+                player2: false,
+                activePuck: null,
+                endTime: null
             }
         };
 
         this.ui.createPlayAgainButton();
         this.ui.createRepelButton();
+        this.ui.createGhostButton();
         console.log('Game initialized in mode:', gameMode);
         this.gameLoop();
     }
@@ -153,7 +160,9 @@ export class Game {
             chargeStartTime: null,
             rotationCenter: null,
             gameEnded: false,
-            winner: null
+            winner: null,
+            repelPower: { player1: false, player2: false, activePuck: null },
+            ghostPower: { player1: false, player2: false, activePuck: null, endTime: null }
         };
         this.ui.hidePlayAgainButton();
     }
@@ -166,7 +175,8 @@ export class Game {
                 y: data.puck.y,
                 vx: data.puck.vx,
                 vy: data.puck.vy,
-                hasRepel: data.puck.hasRepel
+                hasRepel: data.puck.hasRepel,
+                hasGhost: data.puck.hasGhost
             };
 
             this.gameState.pucks.push(puck);
@@ -178,6 +188,9 @@ export class Game {
         }
         else if (data.type === 'repelActivated') {
             this.gameState.repelPower[`player${data.player}`] = true;
+        }
+        else if (data.type === 'ghostActivated') {
+            this.gameState.ghostPower[`player${data.player}`] = true;
         }
         else if (data.type === 'reset') {
             this.resetGame();

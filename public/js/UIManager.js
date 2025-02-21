@@ -6,6 +6,36 @@ export class UIManager {
         this.createScoreboard();
         this.errorMessages = [];
         this.gameStateMessages = [];
+
+        // Log viewport and container dimensions
+        window.addEventListener('resize', () => this.logResponsiveMetrics());
+        requestAnimationFrame(() => this.logResponsiveMetrics());
+    }
+
+    logResponsiveMetrics() {
+        console.log('=== Responsive Design Metrics ===', {
+            viewport: {
+                width: window.innerWidth,
+                height: window.innerHeight
+            },
+            canvas: {
+                width: this.game.canvas.width,
+                height: this.game.canvas.height,
+                offsetWidth: this.game.canvas.offsetWidth,
+                offsetHeight: this.game.canvas.offsetHeight,
+                scale: this.game.canvas.offsetWidth / this.game.canvas.width
+            },
+            container: {
+                width: this.game.canvas.parentElement.offsetWidth,
+                height: this.game.canvas.parentElement.offsetHeight,
+                style: window.getComputedStyle(this.game.canvas.parentElement)
+            },
+            relativeSizes: {
+                buttonOffsetInVW: (120 / window.innerWidth) * 100,
+                buttonBottomInVH: (60 / window.innerHeight) * 100,
+                canvasWidthPercentage: (this.game.canvas.offsetWidth / window.innerWidth) * 100
+            }
+        });
     }
 
     createScoreboard() {
@@ -73,24 +103,89 @@ export class UIManager {
         const button = document.createElement('button');
         button.id = 'repelButton';
         button.className = 'game-button';
-        button.textContent = 'Repel Power';
+        
+        // Create container for icon and text
+        const buttonContent = document.createElement('div');
+        buttonContent.style.display = 'flex';
+        buttonContent.style.alignItems = 'center';
+        buttonContent.style.justifyContent = 'center';
+        buttonContent.style.gap = '8px';
+
+        // Add magnet icon
+        const icon = document.createElement('span');
+        icon.innerHTML = '🧲';
+        icon.style.fontSize = '20px';
+
+        // Add text
+        const text = document.createElement('span');
+        text.textContent = 'Repel Power';
+        text.style.fontSize = '16px';
+        text.style.fontWeight = '600';
+
+        buttonContent.appendChild(icon);
+        buttonContent.appendChild(text);
+        button.appendChild(buttonContent);
+
+        // Position button under the canvas
         button.style.position = 'absolute';
-        button.style.bottom = CONFIG.UI.REPEL_BUTTON.MARGIN + 'px';
         button.style.left = '50%';
         button.style.transform = 'translateX(-50%)';
-        button.style.width = CONFIG.UI.REPEL_BUTTON.WIDTH + 'px';
-        button.style.height = CONFIG.UI.REPEL_BUTTON.HEIGHT + 'px';
-        button.style.display = 'block';
+        button.style.bottom = '-60px';
+        button.style.zIndex = '100';
+        
+        // Modern button styling
+        button.style.padding = '12px 24px';
         button.style.backgroundColor = '#4CAF50';
         button.style.color = 'white';
         button.style.border = 'none';
-        button.style.borderRadius = '5px';
+        button.style.borderRadius = '8px';
         button.style.cursor = 'pointer';
-        
-        button.addEventListener('click', () => this.handleRepelButtonClick());
-        
-        document.body.appendChild(button);
+        button.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+        button.style.transition = 'all 0.3s ease';
+
+        // Add click handler and hover effects
+        button.addEventListener('click', () => {
+            console.log('Repel button clicked');
+            this.handleRepelButtonClick();
+        });
+
+        button.addEventListener('mouseover', () => {
+            if (!button.disabled) {
+                button.style.backgroundColor = '#45a049';
+            }
+        });
+
+        button.addEventListener('mouseout', () => {
+            if (!button.disabled) {
+                button.style.backgroundColor = '#4CAF50';
+            }
+        });
+
+        // Add button to the canvas container
+        this.game.canvas.parentElement.appendChild(button);
         this.repelButton = button;
+
+        // Log detailed button metrics
+        requestAnimationFrame(() => {
+            const buttonRect = button.getBoundingClientRect();
+            console.log('=== Repel Button Detailed Metrics ===', {
+                dimensions: {
+                    width: buttonRect.width,
+                    height: buttonRect.height,
+                    computedStyle: window.getComputedStyle(button)
+                },
+                position: {
+                    left: buttonRect.left,
+                    right: buttonRect.right,
+                    centerOffset: buttonRect.left + (buttonRect.width / 2) - (window.innerWidth / 2)
+                },
+                clickable: {
+                    pointerEvents: window.getComputedStyle(button).pointerEvents,
+                    zIndex: window.getComputedStyle(button).zIndex,
+                    isVisible: buttonRect.width > 0 && buttonRect.height > 0
+                }
+            });
+        });
     }
 
     handleRepelButtonClick() {
@@ -123,12 +218,182 @@ export class UIManager {
         const isPlayerTurn = this.game.playerNumber === this.game.gameState.activePlayer;
         
         this.repelButton.disabled = isUsed || !isPlayerTurn;
-        this.repelButton.style.backgroundColor = isUsed ? '#ccc' : (isPlayerTurn ? '#4CAF50' : '#666');
+        
+        // Update button appearance based on state
+        if (isUsed) {
+            this.repelButton.style.backgroundColor = '#ccc';
+            this.repelButton.style.cursor = 'not-allowed';
+            this.repelButton.style.boxShadow = 'none';
+        } else if (!isPlayerTurn) {
+            this.repelButton.style.backgroundColor = '#666';
+            this.repelButton.style.cursor = 'not-allowed';
+            this.repelButton.style.boxShadow = 'none';
+        } else {
+            this.repelButton.style.backgroundColor = '#4CAF50';
+            this.repelButton.style.cursor = 'pointer';
+            this.repelButton.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+        }
+    }
+
+    createGhostButton() {
+        const button = document.createElement('button');
+        button.id = 'ghostButton';
+        button.className = 'game-button';
+        
+        // Create container for icon and text
+        const buttonContent = document.createElement('div');
+        buttonContent.style.display = 'flex';
+        buttonContent.style.alignItems = 'center';
+        buttonContent.style.justifyContent = 'center';
+        buttonContent.style.gap = '8px';
+
+        // Add ghost icon
+        const icon = document.createElement('span');
+        icon.innerHTML = '👻';
+        icon.style.fontSize = '20px';
+
+        // Add text
+        const text = document.createElement('span');
+        text.textContent = 'Ghost Power';
+        text.style.fontSize = '16px';
+        text.style.fontWeight = '600';
+
+        buttonContent.appendChild(icon);
+        buttonContent.appendChild(text);
+        button.appendChild(buttonContent);
+
+        // Position button under the canvas next to repel button
+        button.style.position = 'absolute';
+        button.style.left = 'calc(50% + 200px)'; // Increased offset
+        button.style.transform = 'translateX(-50%)';
+        button.style.bottom = '-60px';
+        button.style.zIndex = '100';
+        
+        // Modern button styling
+        button.style.padding = '12px 24px';
+        button.style.backgroundColor = '#9b59b6';
+        button.style.color = 'white';
+        button.style.border = 'none';
+        button.style.borderRadius = '8px';
+        button.style.cursor = 'pointer';
+        button.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+        button.style.transition = 'all 0.3s ease';
+
+        // Add click handler and hover effects
+        button.addEventListener('click', () => {
+            console.log('Ghost button clicked');
+            this.handleGhostButtonClick();
+        });
+
+        button.addEventListener('mouseover', () => {
+            if (!button.disabled) {
+                button.style.backgroundColor = '#8e44ad';
+            }
+        });
+
+        button.addEventListener('mouseout', () => {
+            if (!button.disabled) {
+                button.style.backgroundColor = '#9b59b6';
+            }
+        });
+
+        this.game.canvas.parentElement.appendChild(button);
+        this.ghostButton = button;
+
+        // Log detailed button metrics
+        requestAnimationFrame(() => {
+            const buttonRect = button.getBoundingClientRect();
+            const repelRect = this.repelButton.getBoundingClientRect();
+            console.log('=== Ghost Button Detailed Metrics ===', {
+                dimensions: {
+                    width: buttonRect.width,
+                    height: buttonRect.height,
+                    computedStyle: window.getComputedStyle(button)
+                },
+                position: {
+                    left: buttonRect.left,
+                    right: buttonRect.right,
+                    distanceFromRepel: buttonRect.left - repelRect.right
+                },
+                clickable: {
+                    pointerEvents: window.getComputedStyle(button).pointerEvents,
+                    zIndex: window.getComputedStyle(button).zIndex,
+                    isVisible: buttonRect.width > 0 && buttonRect.height > 0
+                }
+            });
+        });
+    }
+
+    handleGhostButtonClick() {
+        if (this.game.playerNumber !== this.game.gameState.activePlayer) {
+            return; // Not this player's turn
+        }
+
+        const playerKey = `player${this.game.playerNumber}`;
+        if (this.game.gameState.ghostPower[playerKey]) {
+            return; // Already used ghost power
+        }
+
+        this.game.gameState.ghostPower[playerKey] = true;
+        this.ghostButton.style.backgroundColor = '#ccc';
+        this.ghostButton.disabled = true;
+
+        // Notify other players
+        this.game.socket.emit('gameMove', {
+            roomId: this.game.roomId,
+            type: 'ghostActivated',
+            player: this.game.playerNumber
+        });
+    }
+
+    updateGhostButton() {
+        if (!this.ghostButton) return;
+        
+        const playerKey = `player${this.game.playerNumber}`;
+        const isUsed = this.game.gameState.ghostPower[playerKey];
+        const isPlayerTurn = this.game.playerNumber === this.game.gameState.activePlayer;
+        
+        this.ghostButton.disabled = isUsed || !isPlayerTurn;
+        
+        // Update button appearance based on state
+        if (isUsed) {
+            this.ghostButton.style.backgroundColor = '#ccc';
+            this.ghostButton.style.cursor = 'not-allowed';
+            this.ghostButton.style.boxShadow = 'none';
+        } else if (!isPlayerTurn) {
+            this.ghostButton.style.backgroundColor = '#666';
+            this.ghostButton.style.cursor = 'not-allowed';
+            this.ghostButton.style.boxShadow = 'none';
+        } else {
+            this.ghostButton.style.backgroundColor = '#9b59b6';
+            this.ghostButton.style.cursor = 'pointer';
+            this.ghostButton.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+        }
     }
 
     update() {
         this.updateScoreboard();
         this.updateRepelButton();
+        this.updateGhostButton();
+
+        // Log button positions during updates to check for changes
+        if (this.repelButton && this.ghostButton) {
+            const repelRect = this.repelButton.getBoundingClientRect();
+            const ghostRect = this.ghostButton.getBoundingClientRect();
+            console.log('=== Button Spacing Update ===', {
+                repelLeft: repelRect.left,
+                repelRight: repelRect.right,
+                ghostLeft: ghostRect.left,
+                spacing: ghostRect.left - repelRect.right,
+                containerWidth: this.game.canvas.parentElement.offsetWidth
+            });
+        }
+
+        // Log responsive metrics on window resize
+        if (this.lastWindowWidth !== window.innerWidth) {
+            this.lastWindowWidth = window.innerWidth;
+            this.logResponsiveMetrics();
+        }
     }
 
     updateScoreboard() {

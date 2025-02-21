@@ -156,6 +156,18 @@ export class PhysicsEngine {
     }
 
     handlePuckCollisions(puck) {
+        // Skip collision checks if puck has ghost power
+        if (puck.hasGhost) {
+            // Check if ghost duration has expired
+            const currentTime = Date.now();
+            if (currentTime - puck.ghostStartTime > CONFIG.PUCK.GHOST_DURATION) {
+                puck.hasGhost = false;
+                delete puck.ghostStartTime;
+            } else {
+                return; // Skip collision handling for ghost pucks
+            }
+        }
+
         for (let i = 0; i < this.game.gameState.pucks.length; i++) {
             const otherPuck = this.game.gameState.pucks[i];
             if (puck === otherPuck) continue;
@@ -195,7 +207,7 @@ export class PhysicsEngine {
                 continue;
             }
 
-            // Normal collision handling (only if not repelling)
+            // Normal collision handling (only if not repelling or ghost)
             if (distance < CONFIG.PUCK.RADIUS * 2) {
                 if (this.game.gameState.activePlayer === this.game.playerNumber) {
                     this.game.socket.emit('gameMove', {
@@ -461,6 +473,7 @@ export class PhysicsEngine {
 
         const playerKey = `player${this.game.gameState.activePlayer}`;
         const hasRepel = this.game.gameState.repelPower[playerKey];
+        const hasGhost = this.game.gameState.ghostPower[playerKey];
 
         const launchedPuck = {
             x: this.game.gameState.currentPuck.x,
@@ -468,8 +481,14 @@ export class PhysicsEngine {
             vx: velocity.x,
             vy: velocity.y,
             player: this.game.gameState.activePlayer,
-            hasRepel: hasRepel
+            hasRepel: hasRepel,
+            hasGhost: hasGhost
         };
+
+        if (hasGhost) {
+            launchedPuck.ghostStartTime = Date.now();
+            this.game.gameState.ghostPower.activePuck = launchedPuck;
+        }
 
         if (hasRepel) {
             this.game.gameState.repelPower.activePuck = launchedPuck;
