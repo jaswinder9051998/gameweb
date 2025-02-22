@@ -255,12 +255,6 @@ export class Renderer {
         if (!this.game.gameState.sparks) return;
         
         this.game.gameState.sparks.forEach(spark => {
-            console.log('Drawing spark:', {
-                position: { x: spark.x, y: spark.y },
-                life: spark.life,
-                color: spark.color
-            });
-
             this.ctx.save();
             const gradient = this.ctx.createRadialGradient(
                 spark.x, spark.y, 0,

@@ -213,7 +213,8 @@ export class UIManager {
         console.log('=== Repel Button Click ===', {
             isPlayerTurn: this.game.playerNumber === this.game.gameState.activePlayer,
             playerNumber: this.game.playerNumber,
-            activePlayer: this.game.gameState.activePlayer
+            activePlayer: this.game.gameState.activePlayer,
+            powerUsed: this.game.gameState.repelPower[`player${this.game.playerNumber}`]
         });
 
         if (this.game.playerNumber !== this.game.gameState.activePlayer) {
@@ -222,12 +223,19 @@ export class UIManager {
 
         const playerKey = `player${this.game.playerNumber}`;
         if (this.game.gameState.repelPower[playerKey]) {
-            return; // Already used repel power
+            return; // Already used repel power this game
         }
 
-        this.game.gameState.repelPower[playerKey] = true;
+        // Set repel power as used for this game
+        this.game.gameState.repelPower = {
+            ...this.game.gameState.repelPower,
+            [playerKey]: true,
+            activePuck: null
+        };
+
         this.repelButton.style.backgroundColor = '#ccc';
         this.repelButton.disabled = true;
+        this.repelButton.title = 'Repel Power already used this game';
 
         // Notify other players
         this.game.socket.emit('gameMove', {
@@ -251,14 +259,17 @@ export class UIManager {
             this.repelButton.style.backgroundColor = '#ccc';
             this.repelButton.style.cursor = 'not-allowed';
             this.repelButton.style.boxShadow = 'none';
+            this.repelButton.title = 'Repel Power already used this game';
         } else if (!isPlayerTurn) {
             this.repelButton.style.backgroundColor = '#666';
             this.repelButton.style.cursor = 'not-allowed';
             this.repelButton.style.boxShadow = 'none';
+            this.repelButton.title = 'Wait for your turn';
         } else {
             this.repelButton.style.backgroundColor = '#4CAF50';
             this.repelButton.style.cursor = 'pointer';
             this.repelButton.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+            this.repelButton.title = 'Click to use Repel Power (one-time use per game)';
         }
     }
 
@@ -327,7 +338,8 @@ export class UIManager {
         console.log('=== Ghost Button Click ===', {
             isPlayerTurn: this.game.playerNumber === this.game.gameState.activePlayer,
             playerNumber: this.game.playerNumber,
-            activePlayer: this.game.gameState.activePlayer
+            activePlayer: this.game.gameState.activePlayer,
+            powerUsed: this.game.gameState.ghostPower[`player${this.game.playerNumber}`]
         });
 
         if (this.game.playerNumber !== this.game.gameState.activePlayer) {
@@ -336,12 +348,20 @@ export class UIManager {
 
         const playerKey = `player${this.game.playerNumber}`;
         if (this.game.gameState.ghostPower[playerKey]) {
-            return; // Already used ghost power
+            return; // Already used ghost power this game
         }
 
-        this.game.gameState.ghostPower[playerKey] = true;
+        // Set ghost power as used for this game and mark it for next puck only
+        this.game.gameState.ghostPower = {
+            ...this.game.gameState.ghostPower,
+            [playerKey]: true,
+            pendingGhost: true, // Flag to indicate the next puck should be ghost
+            activePuck: null
+        };
+
         this.ghostButton.style.backgroundColor = '#ccc';
         this.ghostButton.disabled = true;
+        this.ghostButton.title = 'Ghost Power already used this game';
 
         // Notify other players
         this.game.socket.emit('gameMove', {
@@ -365,14 +385,17 @@ export class UIManager {
             this.ghostButton.style.backgroundColor = '#ccc';
             this.ghostButton.style.cursor = 'not-allowed';
             this.ghostButton.style.boxShadow = 'none';
+            this.ghostButton.title = 'Ghost Power already used this game';
         } else if (!isPlayerTurn) {
             this.ghostButton.style.backgroundColor = '#666';
             this.ghostButton.style.cursor = 'not-allowed';
             this.ghostButton.style.boxShadow = 'none';
+            this.ghostButton.title = 'Wait for your turn';
         } else {
             this.ghostButton.style.backgroundColor = '#9b59b6';
             this.ghostButton.style.cursor = 'pointer';
             this.ghostButton.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+            this.ghostButton.title = 'Click to use Ghost Power (one-time use per game)';
         }
     }
 

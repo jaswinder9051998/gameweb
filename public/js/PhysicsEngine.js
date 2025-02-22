@@ -161,11 +161,42 @@ export class PhysicsEngine {
             // Check if ghost duration has expired
             const currentTime = Date.now();
             if (currentTime - puck.ghostStartTime > CONFIG.PUCK.GHOST_DURATION) {
+                console.log('=== Ghost Power Expired ===', {
+                    puck: {
+                        player: puck.player,
+                        turnCreated: puck.turnCreated
+                    },
+                    duration: currentTime - puck.ghostStartTime,
+                    reason: 'Duration exceeded'
+                });
                 puck.hasGhost = false;
                 delete puck.ghostStartTime;
+                // Clear the active puck reference if this was the active ghost puck
+                if (this.game.gameState.ghostPower.activePuck === puck) {
+                    this.game.gameState.ghostPower.activePuck = null;
+                }
             } else {
                 return; // Skip collision handling for ghost pucks
             }
+        }
+
+        // Check if repel power should still be active
+        // Only expire repel if:
+        // 1. The puck has repel power
+        // 2. It's not the turn it was created in
+        // 3. It's not the turn immediately after it was created
+        if (puck.hasRepel && 
+            puck.turnCreated !== this.game.gameState.activePlayer && 
+            Math.abs(puck.turnCreated - this.game.gameState.activePlayer) > 1) {
+            puck.hasRepel = false;
+            console.log('=== Repel Power Expired ===', {
+                puck: {
+                    player: puck.player,
+                    turnCreated: puck.turnCreated
+                },
+                currentTurn: this.game.gameState.activePlayer,
+                reason: 'Turn changed'
+            });
         }
 
         for (let i = 0; i < this.game.gameState.pucks.length; i++) {
@@ -178,37 +209,65 @@ export class PhysicsEngine {
 
             // Handle repulsion first
             if (puck.hasRepel && distance < CONFIG.PUCK.REPEL_RADIUS) {
-                console.log('=== Magnetic Repulsion ===', {
-                    distance,
-                    repelRadius: CONFIG.PUCK.REPEL_RADIUS
-                });
-                
-                // Enforce minimum separation (stronger repulsion at closer distances)
-                const minDistance = CONFIG.PUCK.RADIUS * 5; // Keep pucks at least 5x radius apart
-                if (distance < minDistance) {
-                    // Move pucks apart to maintain minimum distance
-                    const separation = (minDistance - distance) / 2;
-                    const nx = dx / distance;
-                    const ny = dy / distance;
+                // Only log first repel interaction
+                if (!puck.loggedRepelWith?.[otherPuck.player]) {
+                    console.log('=== Repel Collision ===', {
+                        repelPuck: {
+                            player: puck.player,
+                            turnCreated: puck.turnCreated,
+                            hasRepel: puck.hasRepel
+                        },
+                        otherPuck: {
+                            player: otherPuck.player,
+                            turnCreated: otherPuck.turnCreated
+                        },
+                        currentTurn: this.game.gameState.activePlayer
+                    });
                     
-                    // Move repelling puck back
-                    puck.x += nx * separation;
-                    puck.y += ny * separation;
-                    
-                    // Move other puck away
-                    otherPuck.x -= nx * separation;
-                    otherPuck.y -= ny * separation;
+                    // Mark this interaction as logged
+                    puck.loggedRepelWith = puck.loggedRepelWith || {};
+                    puck.loggedRepelWith[otherPuck.player] = true;
                 }
-
-                // Apply repel force (inverse square law like real magnets)
-                this.applyRepelForce(puck, otherPuck, dx, dy, distance);
                 
-                // Skip collision handling completely for repelling pucks
+                // Apply repel force
+                this.applyRepelForce(puck, otherPuck, dx, dy, distance);
+
+                // After applying repel force, mark the power as used
+                puck.hasRepel = false;
+                console.log('=== Repel Power Expired ===', {
+                    puck: {
+                        player: puck.player,
+                        turnCreated: puck.turnCreated
+                    },
+                    currentTurn: this.game.gameState.activePlayer,
+                    reason: 'Used in collision'
+                });
                 continue;
             }
 
-            // Normal collision handling (only if not repelling or ghost)
+            // Normal collision handling
             if (distance < CONFIG.PUCK.RADIUS * 2) {
+                // Only log first collision between these pucks
+                if (!puck.loggedCollisionWith?.[otherPuck.player]) {
+                    console.log('=== Collision ===', {
+                        puck1: {
+                            player: puck.player,
+                            turnCreated: puck.turnCreated,
+                            hasRepel: puck.hasRepel
+                        },
+                        puck2: {
+                            player: otherPuck.player,
+                            turnCreated: otherPuck.turnCreated,
+                            hasRepel: otherPuck.hasRepel
+                        },
+                        currentTurn: this.game.gameState.activePlayer
+                    });
+                    
+                    // Mark this collision as logged
+                    puck.loggedCollisionWith = puck.loggedCollisionWith || {};
+                    puck.loggedCollisionWith[otherPuck.player] = true;
+                }
+
                 if (this.game.gameState.activePlayer === this.game.playerNumber) {
                     this.game.socket.emit('gameMove', {
                         roomId: this.game.roomId,
@@ -217,13 +276,15 @@ export class PhysicsEngine {
                             x: puck.x,
                             y: puck.y,
                             vx: puck.vx || 0,
-                            vy: puck.vy || 0
+                            vy: puck.vy || 0,
+                            hasRepel: puck.hasRepel
                         },
                         puck2: {
                             x: otherPuck.x,
                             y: otherPuck.y,
                             vx: otherPuck.vx || 0,
-                            vy: otherPuck.vy || 0
+                            vy: otherPuck.vy || 0,
+                            hasRepel: otherPuck.hasRepel
                         }
                     });
                 }
@@ -234,23 +295,13 @@ export class PhysicsEngine {
     }
 
     applyRepelForce(puck, otherPuck, dx, dy, distance) {
-        console.log('=== Repel Force Start ===');
-        
-        // Calculate repel force using inverse square law (like real magnets)
-        // Force increases dramatically as distance decreases
+        // Calculate repel force using inverse square law
         const distanceRatio = distance / CONFIG.PUCK.REPEL_RADIUS;
-        // Increased base force for stronger repulsion at 5x radius
         const force = CONFIG.PUCK.REPEL_FORCE * 1.5 * (1 / (distanceRatio * distanceRatio));
         
         // Direction should be away from repelling puck
         const nx = -dx / distance;
         const ny = -dy / distance;
-
-        console.log('Magnetic Force:', {
-            distance,
-            force,
-            direction: { nx, ny }
-        });
 
         // Calculate velocity changes with stronger effect at close range
         const dvx = nx * force;
@@ -259,31 +310,6 @@ export class PhysicsEngine {
         // Apply velocity changes to other puck with increased effect
         otherPuck.vx = (otherPuck.vx || 0) + dvx;
         otherPuck.vy = (otherPuck.vy || 0) + dvy;
-
-        // Create repel effect visual (more intense at closer ranges)
-        const intensity = Math.min(1, CONFIG.PUCK.REPEL_RADIUS / distance);
-        this.createRepelEffect(puck.x, puck.y, otherPuck.x, otherPuck.y, intensity);
-    }
-
-    createRepelEffect(x1, y1, x2, y2, intensity) {
-        const sparks = Math.floor(5 * intensity); // More sparks at closer ranges
-        const angle = Math.atan2(y2 - y1, x2 - x1);
-        
-        for (let i = 0; i < sparks; i++) {
-            const sparkAngle = angle + (Math.random() - 0.5) * Math.PI / 4;
-            const speed = (Math.random() * 2 + 2) * intensity;
-            
-            const spark = {
-                x: (x1 + x2) / 2,
-                y: (y1 + y2) / 2,
-                vx: Math.cos(sparkAngle) * speed,
-                vy: Math.sin(sparkAngle) * speed,
-                life: 1,
-                color: '#00ff00'
-            };
-            
-            this.game.gameState.sparks.push(spark);
-        }
     }
 
     resolvePuckCollision(puck1, puck2, dx, dy, distance) {
@@ -473,7 +499,20 @@ export class PhysicsEngine {
 
         const playerKey = `player${this.game.gameState.activePlayer}`;
         const hasRepel = this.game.gameState.repelPower[playerKey];
-        const hasGhost = this.game.gameState.ghostPower[playerKey];
+        // Only apply ghost if it's pending for the next puck
+        const hasGhost = this.game.gameState.ghostPower[playerKey] && this.game.gameState.ghostPower.pendingGhost;
+
+        console.log('=== Launching Puck ===', {
+            player: this.game.gameState.activePlayer,
+            turn: this.game.gameState.activePlayer,
+            powers: {
+                repel: hasRepel,
+                ghost: hasGhost,
+                ghostPending: this.game.gameState.ghostPower.pendingGhost
+            },
+            ghostState: this.game.gameState.ghostPower,
+            velocity
+        });
 
         const launchedPuck = {
             x: this.game.gameState.currentPuck.x,
@@ -482,12 +521,15 @@ export class PhysicsEngine {
             vy: velocity.y,
             player: this.game.gameState.activePlayer,
             hasRepel: hasRepel,
-            hasGhost: hasGhost
+            hasGhost: hasGhost,
+            turnCreated: this.game.gameState.activePlayer
         };
 
         if (hasGhost) {
             launchedPuck.ghostStartTime = Date.now();
             this.game.gameState.ghostPower.activePuck = launchedPuck;
+            // Clear the pending ghost flag after applying it to this puck
+            this.game.gameState.ghostPower.pendingGhost = false;
         }
 
         if (hasRepel) {

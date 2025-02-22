@@ -60,6 +60,13 @@ socket.on('reconnect_failed', () => {
     socket.connect();
 });
 
+socket.onAny((eventName, ...args) => {
+    // Only log non-connection events
+    if (!eventName.includes('connect') && !eventName.includes('disconnect')) {
+        console.log(`Event: ${eventName}`, args);
+    }
+});
+
 // Monitor connection state
 setInterval(() => {
     console.log('Connection state:', {
